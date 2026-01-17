@@ -1,0 +1,9 @@
+{
+  "name": "project-juggler-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Project Juggler",
+  "main": "index.js",
+  "dependencies": {
+    "mysql2": "^3.9.0"
+  }
+}
