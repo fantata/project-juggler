@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\MoneyStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProjectType;
+use App\Enums\RetainerFrequency;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -15,6 +16,9 @@ class Project extends Model
         'type',
         'status',
         'waiting_on_client',
+        'is_retainer',
+        'retainer_frequency',
+        'retainer_amount',
         'priority',
         'money_status',
         'money_value',
@@ -34,6 +38,9 @@ class Project extends Model
             'deadline' => 'date',
             'last_touched_at' => 'datetime',
             'waiting_on_client' => 'boolean',
+            'is_retainer' => 'boolean',
+            'retainer_frequency' => RetainerFrequency::class,
+            'retainer_amount' => 'decimal:2',
             'priority' => 'integer',
         ];
     }

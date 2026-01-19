@@ -92,6 +92,32 @@
                             <textarea wire:model="notes" id="notes" rows="4" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Project notes..."></textarea>
                         </div>
 
+                        <div>
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="checkbox" wire:model.live="is_retainer" class="rounded border-gray-300 dark:border-gray-700 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:bg-gray-900">
+                                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Retainer client</span>
+                            </label>
+                        </div>
+
+                        @if($is_retainer)
+                            <div class="grid grid-cols-2 gap-4 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                                <div>
+                                    <label for="retainer_frequency" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Frequency</label>
+                                    <select wire:model="retainer_frequency" id="retainer_frequency" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                        <option value="">Select...</option>
+                                        @foreach($retainerFrequencies as $freq)
+                                            <option value="{{ $freq->value }}">{{ $freq->label() }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label for="retainer_amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Retainer Amount (£)</label>
+                                    <input type="number" step="0.01" wire:model="retainer_amount" id="retainer_amount" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="0.00">
+                                </div>
+                            </div>
+                        @endif
+
                         <div class="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
                             <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-gray-800 dark:bg-gray-200 dark:text-gray-800 border border-transparent rounded-md hover:bg-gray-700 dark:hover:bg-white">
                                 Save Changes
@@ -115,18 +141,27 @@
 
                         <!-- Add Log Entry -->
                         <form wire:submit="addLog" class="mb-6">
-                            <div class="flex gap-2">
+                            <div class="flex gap-2 mb-2">
                                 <input
                                     type="text"
                                     wire:model="newLogEntry"
                                     placeholder="What did you do?"
                                     class="flex-1 rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                                 >
+                                <input
+                                    type="number"
+                                    step="0.25"
+                                    min="0"
+                                    wire:model="newLogHours"
+                                    placeholder="Hours"
+                                    class="w-20 rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                >
                                 <button type="submit" class="px-3 py-2 text-sm font-medium text-white bg-gray-800 dark:bg-gray-200 dark:text-gray-800 rounded-md hover:bg-gray-700 dark:hover:bg-white">
                                     Log
                                 </button>
                             </div>
                             @error('newLogEntry') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                            @error('newLogHours') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                         </form>
 
                         <!-- Log Entries -->
@@ -134,7 +169,12 @@
                             @forelse($logs as $log)
                                 <div class="border-l-2 border-gray-200 dark:border-gray-600 pl-4 py-1">
                                     <p class="text-sm text-gray-800 dark:text-gray-200">{{ $log->entry }}</p>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $log->created_at->format('j M Y, g:ia') }}</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        {{ $log->created_at->format('j M Y, g:ia') }}
+                                        @if($log->hours)
+                                            <span class="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 rounded">{{ $log->hours }}h</span>
+                                        @endif
+                                    </p>
                                 </div>
                             @empty
                                 <p class="text-sm text-gray-500 dark:text-gray-400 italic">No log entries yet.</p>

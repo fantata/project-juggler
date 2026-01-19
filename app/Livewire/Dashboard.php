@@ -41,10 +41,11 @@ class Dashboard extends Component
             $baseQuery->where('money_status', $this->filterMoneyStatus);
         }
 
-        // Active projects (ball in your court)
+        // Active projects (ball in your court, non-retainer)
         // Priority: lower number = higher priority, NULL = unprioritized (at bottom)
         $activeProjects = (clone $baseQuery)
             ->where('waiting_on_client', false)
+            ->where('is_retainer', false)
             ->orderByRaw("CASE WHEN priority IS NULL THEN 1 ELSE 0 END")
             ->orderBy('priority', 'asc')
             ->orderByRaw("CASE WHEN money_status = 'awaiting' THEN 0 ELSE 1 END")
@@ -52,9 +53,18 @@ class Dashboard extends Component
             ->orderBy('money_value', 'desc')
             ->get();
 
-        // Waiting projects (ball with client)
+        // Retainer projects (ongoing retainer clients)
+        $retainerProjects = (clone $baseQuery)
+            ->where('is_retainer', true)
+            ->orderByRaw("CASE WHEN priority IS NULL THEN 1 ELSE 0 END")
+            ->orderBy('priority', 'asc')
+            ->orderBy('name', 'asc')
+            ->get();
+
+        // Waiting projects (ball with client, non-retainer)
         $waitingProjects = (clone $baseQuery)
             ->where('waiting_on_client', true)
+            ->where('is_retainer', false)
             ->orderByRaw("CASE WHEN priority IS NULL THEN 1 ELSE 0 END")
             ->orderBy('priority', 'asc')
             ->orderBy('last_touched_at', 'desc')
@@ -80,6 +90,7 @@ class Dashboard extends Component
 
         return view('livewire.dashboard', [
             'activeProjects' => $activeProjects,
+            'retainerProjects' => $retainerProjects,
             'waitingProjects' => $waitingProjects,
             'completedProjects' => $completedProjects,
             'types' => ProjectType::cases(),

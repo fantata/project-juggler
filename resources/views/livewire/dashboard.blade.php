@@ -59,6 +59,16 @@
             </div>
         </div>
 
+        <!-- Retainer Projects -->
+        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6 ring-2 ring-indigo-500 dark:ring-indigo-400">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-indigo-50 dark:bg-indigo-900/20">
+                <h3 class="text-lg font-medium text-indigo-900 dark:text-indigo-100">Retainers ({{ $retainerProjects->count() }})</h3>
+            </div>
+            <div class="overflow-x-auto">
+                @include('livewire.partials.project-table', ['projects' => $retainerProjects])
+            </div>
+        </div>
+
         <!-- Waiting Projects (Client's Court) -->
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
             <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">

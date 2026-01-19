@@ -10,7 +10,15 @@ class ProjectLog extends Model
     protected $fillable = [
         'project_id',
         'entry',
+        'hours',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'hours' => 'decimal:2',
+        ];
+    }
 
     public function project(): BelongsTo
     {
