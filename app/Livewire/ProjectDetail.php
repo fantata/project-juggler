@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Enums\MoneyStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProjectType;
+use App\Enums\RetainerFrequency;
 use App\Models\Project;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -37,8 +38,18 @@ class ProjectDetail extends Component
     #[Validate('nullable|string')]
     public ?string $notes = null;
 
+    public bool $is_retainer = false;
+
+    public ?string $retainer_frequency = null;
+
+    #[Validate('nullable|numeric|min:0')]
+    public ?string $retainer_amount = null;
+
     #[Validate('required|string|min:1')]
     public string $newLogEntry = '';
+
+    #[Validate('nullable|numeric|min:0')]
+    public ?string $newLogHours = null;
 
     public function mount(Project $project): void
     {
@@ -51,6 +62,9 @@ class ProjectDetail extends Component
         $this->deadline = $project->deadline?->format('Y-m-d');
         $this->next_action = $project->next_action;
         $this->notes = $project->notes;
+        $this->is_retainer = $project->is_retainer;
+        $this->retainer_frequency = $project->retainer_frequency?->value;
+        $this->retainer_amount = $project->retainer_amount;
     }
 
     public function save(): void
@@ -75,6 +89,9 @@ class ProjectDetail extends Component
             'deadline' => $this->deadline ?: null,
             'next_action' => $this->next_action ?: null,
             'notes' => $this->notes ?: null,
+            'is_retainer' => $this->is_retainer,
+            'retainer_frequency' => $this->retainer_frequency ?: null,
+            'retainer_amount' => $this->retainer_amount ?: null,
             'last_touched_at' => now(),
         ]);
 
@@ -83,16 +100,21 @@ class ProjectDetail extends Component
 
     public function addLog(): void
     {
-        $this->validate(['newLogEntry' => 'required|string|min:1']);
+        $this->validate([
+            'newLogEntry' => 'required|string|min:1',
+            'newLogHours' => 'nullable|numeric|min:0',
+        ]);
 
         $this->project->logs()->create([
             'entry' => $this->newLogEntry,
+            'hours' => $this->newLogHours ?: null,
         ]);
 
         $this->project->update(['last_touched_at' => now()]);
         $this->project->refresh();
 
         $this->newLogEntry = '';
+        $this->newLogHours = null;
         session()->flash('log-message', 'Log entry added.');
     }
 
@@ -108,6 +130,7 @@ class ProjectDetail extends Component
             'types' => ProjectType::cases(),
             'statuses' => ProjectStatus::cases(),
             'moneyStatuses' => MoneyStatus::cases(),
+            'retainerFrequencies' => RetainerFrequency::cases(),
             'logs' => $this->project->logs()->orderByDesc('created_at')->get(),
         ]);
     }
