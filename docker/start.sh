@@ -4,8 +4,7 @@ set -e
 cd /var/www/html
 
 # Clear any cached config from build time
-php artisan config:clear
-php artisan cache:clear 2>/dev/null || true
+php artisan config:clear 2>/dev/null || true
 
 # Debug: show database config
 echo "DB_HOST: ${DB_HOST:-not set}"
