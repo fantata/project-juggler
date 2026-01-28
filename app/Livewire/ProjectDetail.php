@@ -64,6 +64,7 @@ class ProjectDetail extends Component
     public string $newIssueTitle = '';
     public string $newIssueDescription = '';
     public string $newIssueUrgency = 'medium';
+    public array $newIssueTasks = [];
     public bool $isParsingEmail = false;
 
     public function mount(Project $project): void
@@ -144,10 +145,14 @@ class ProjectDetail extends Component
 
         $this->isParsingEmail = true;
         $parsed = EmailParser::parse($this->newIssueEmail);
+
         $this->newIssueTitle = $parsed['title'];
         $this->newIssueDescription = $parsed['description'] ?? '';
         $this->newIssueUrgency = $parsed['urgency'];
+        $this->newIssueTasks = $parsed['tasks'] ?? [];
         $this->isParsingEmail = false;
+
+        session()->flash('issue-message', 'Email parsed successfully');
     }
 
     public function createIssue(): void
@@ -164,6 +169,17 @@ class ProjectDetail extends Component
             'urgency' => $this->newIssueUrgency,
             'raw_email' => $this->newIssueEmail ?: null,
         ]);
+
+        // Create AI-generated tasks
+        foreach ($this->newIssueTasks as $position => $taskDescription) {
+            if (!empty(trim($taskDescription))) {
+                $issue->tasks()->create([
+                    'description' => trim($taskDescription),
+                    'position' => $position + 1,
+                    'is_ai_generated' => true,
+                ]);
+            }
+        }
 
         // Push to GitHub if configured
         if ($this->project->github_repo && GitHubService::isConfigured()) {
@@ -188,6 +204,7 @@ class ProjectDetail extends Component
         $this->newIssueTitle = '';
         $this->newIssueDescription = '';
         $this->newIssueUrgency = 'medium';
+        $this->newIssueTasks = [];
         $this->showIssueForm = false;
 
         session()->flash('issue-message', 'Issue created.');
@@ -269,6 +286,79 @@ class ProjectDetail extends Component
         session()->flash('issue-message', "Synced from GitHub: {$created} created, {$updated} updated.");
     }
 
+    public function addTask(int $issueId, string $description): void
+    {
+        if (empty(trim($description))) {
+            return;
+        }
+
+        $issue = $this->project->issues()->findOrFail($issueId);
+        $maxPosition = $issue->tasks()->max('position') ?? 0;
+
+        $issue->tasks()->create([
+            'description' => trim($description),
+            'position' => $maxPosition + 1,
+        ]);
+
+        $this->project->update(['last_touched_at' => now()]);
+        $this->project->refresh();
+    }
+
+    public function toggleTask(int $taskId): void
+    {
+        $task = \App\Models\IssueTask::whereHas('issue', fn($q) => $q->where('project_id', $this->project->id))
+            ->findOrFail($taskId);
+
+        $task->update(['is_complete' => !$task->is_complete]);
+        $this->project->refresh();
+    }
+
+    public function deleteTask(int $taskId): void
+    {
+        $task = \App\Models\IssueTask::whereHas('issue', fn($q) => $q->where('project_id', $this->project->id))
+            ->findOrFail($taskId);
+
+        $task->delete();
+        $this->project->refresh();
+    }
+
+    public function reparseIssue(int $issueId): void
+    {
+        $issue = $this->project->issues()->findOrFail($issueId);
+
+        if (empty($issue->raw_email)) {
+            session()->flash('issue-message', 'No raw email to re-parse.');
+            return;
+        }
+
+        $parsed = EmailParser::parse($issue->raw_email);
+
+        // Delete only AI-generated tasks (preserve user-created ones)
+        $issue->tasks()->where('is_ai_generated', true)->delete();
+
+        // Create new AI-generated tasks
+        $maxPosition = $issue->tasks()->max('position') ?? 0;
+        foreach ($parsed['tasks'] ?? [] as $index => $taskDescription) {
+            if (!empty(trim($taskDescription))) {
+                $issue->tasks()->create([
+                    'description' => trim($taskDescription),
+                    'position' => $maxPosition + $index + 1,
+                    'is_ai_generated' => true,
+                ]);
+            }
+        }
+
+        // Update title, description, urgency from re-parse
+        $issue->update([
+            'title' => $parsed['title'],
+            'description' => $parsed['description'] ?? $issue->description,
+            'urgency' => $parsed['urgency'],
+        ]);
+
+        $this->project->refresh();
+        session()->flash('issue-message', 'Issue re-parsed successfully.');
+    }
+
     public function delete(): void
     {
         $this->project->delete();
@@ -286,6 +376,8 @@ class ProjectDetail extends Component
             'issueUrgencies' => IssueUrgency::cases(),
             'logs' => $this->project->logs()->orderByDesc('created_at')->get(),
             'issues' => $this->project->issues()
+                ->with('tasks')
+                ->withCount(['tasks', 'tasks as completed_tasks_count' => fn($q) => $q->where('is_complete', true)])
                 ->orderByRaw("CASE WHEN status = 'done' THEN 1 ELSE 0 END")
                 ->orderByDesc('created_at')
                 ->get(),

@@ -18,22 +18,21 @@ async function getDb() {
 }
 
 async function parseEmail(rawEmail) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
         return fallbackParse(rawEmail);
     }
 
     try {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01',
+                'Authorization': `Bearer ${apiKey}`,
             },
             body: JSON.stringify({
-                model: 'claude-sonnet-4-20250514',
+                model: 'llama-3.3-70b-versatile',
                 max_tokens: 1024,
                 messages: [
                     {
@@ -45,16 +44,26 @@ async function parseEmail(rawEmail) {
         });
 
         const data = await response.json();
-        const text = data.content?.[0]?.text;
+        let text = data.choices?.[0]?.message?.content || '';
+
+        // Strip markdown code fences if present
+        text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
         const parsed = JSON.parse(text);
 
         if (!parsed || !parsed.title) {
             return fallbackParse(rawEmail);
         }
 
+        // Handle description as array (bullet points) or string
+        let description = parsed.description || null;
+        if (Array.isArray(description)) {
+            description = description.map(item => `• ${item}`).join('\n');
+        }
+
         return {
             title: parsed.title.substring(0, 255),
-            description: parsed.description || null,
+            description,
             urgency: ['low', 'medium', 'high'].includes(parsed.urgency) ? parsed.urgency : 'medium',
         };
     } catch (e) {

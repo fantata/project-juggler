@@ -24,6 +24,9 @@ fi
 # Run migrations
 php artisan migrate --force
 
+# Publish Livewire assets
+php artisan livewire:publish --assets
+
 # Cache config and routes for production (now with correct env vars)
 php artisan config:cache
 php artisan route:cache
