@@ -17,6 +17,106 @@ async function getDb() {
     return db;
 }
 
+async function parseEmail(rawEmail) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+
+    if (!apiKey) {
+        return fallbackParse(rawEmail);
+    }
+
+    try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: 1024,
+                messages: [
+                    {
+                        role: 'user',
+                        content: `Extract structured data from this client email. Return ONLY valid JSON (no markdown, no code fences) with these fields:\n- title: a short summary of what the client needs (max 100 chars)\n- description: bullet-point action items extracted from the email\n- urgency: one of 'low', 'medium', 'high' based on the tone and content\n\nEmail:\n${rawEmail}`,
+                    },
+                ],
+            }),
+        });
+
+        const data = await response.json();
+        const text = data.content?.[0]?.text;
+        const parsed = JSON.parse(text);
+
+        if (!parsed || !parsed.title) {
+            return fallbackParse(rawEmail);
+        }
+
+        return {
+            title: parsed.title.substring(0, 255),
+            description: parsed.description || null,
+            urgency: ['low', 'medium', 'high'].includes(parsed.urgency) ? parsed.urgency : 'medium',
+        };
+    } catch (e) {
+        return fallbackParse(rawEmail);
+    }
+}
+
+// GitHub API helpers
+function githubConfigured() {
+    return !!process.env.GITHUB_TOKEN;
+}
+
+async function githubApi(method, path, body = null) {
+    const opts = {
+        method,
+        headers: {
+            'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'Content-Type': 'application/json',
+        },
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const response = await fetch(`https://api.github.com${path}`, opts);
+    return response.json();
+}
+
+async function githubCreateIssue(repo, title, body) {
+    return githubApi('POST', `/repos/${repo}/issues`, { title, body });
+}
+
+async function githubCloseIssue(repo, number) {
+    return githubApi('PATCH', `/repos/${repo}/issues/${number}`, { state: 'closed' });
+}
+
+async function githubReopenIssue(repo, number) {
+    return githubApi('PATCH', `/repos/${repo}/issues/${number}`, { state: 'open' });
+}
+
+async function githubListIssues(repo, state = 'all') {
+    const allIssues = [];
+    let page = 1;
+    while (true) {
+        const issues = await githubApi('GET', `/repos/${repo}/issues?state=${state}&per_page=100&page=${page}`);
+        if (!Array.isArray(issues) || issues.length === 0) break;
+        // Filter out pull requests
+        allIssues.push(...issues.filter(i => !i.pull_request));
+        if (issues.length < 100) break;
+        page++;
+    }
+    return allIssues;
+}
+
+function fallbackParse(rawEmail) {
+    const lines = rawEmail.trim().split('\n');
+    return {
+        title: (lines[0] || 'Untitled issue').substring(0, 255),
+        description: rawEmail,
+        urgency: 'medium',
+    };
+}
+
 const tools = [
     {
         name: 'list_projects',
@@ -58,6 +158,7 @@ const tools = [
                 deadline: { type: 'string', description: 'Deadline (YYYY-MM-DD)' },
                 next_action: { type: 'string', description: 'GTD-style next action' },
                 notes: { type: 'string', description: 'Project notes' },
+                github_repo: { type: 'string', description: 'GitHub repository (org/repo format)' },
             },
             required: ['name', 'type'],
         },
@@ -80,6 +181,7 @@ const tools = [
                 deadline: { type: 'string', description: 'YYYY-MM-DD or empty to clear' },
                 next_action: { type: 'string', description: 'Empty to clear' },
                 notes: { type: 'string' },
+                github_repo: { type: 'string', description: 'GitHub repo (org/repo format, empty to clear)' },
             },
         },
     },
@@ -98,8 +200,61 @@ const tools = [
     },
     {
         name: 'quick_status',
-        description: 'Get overview: active count, blocked projects, upcoming deadlines, projects awaiting money',
+        description: 'Get overview: active count, blocked projects, upcoming deadlines, projects awaiting money, open issues',
         inputSchema: { type: 'object', properties: {} },
+    },
+    {
+        name: 'create_issue',
+        description: 'Create an issue/ticket on a project. Either provide a title directly, or provide raw_email to have AI parse it into a structured issue.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                project_id: { type: 'integer', description: 'Project ID' },
+                project_name: { type: 'string', description: 'Project name (fuzzy match)' },
+                title: { type: 'string', description: 'Issue title (optional if raw_email provided)' },
+                description: { type: 'string', description: 'Issue description / action items' },
+                urgency: { type: 'string', description: 'Issue urgency', enum: ['low', 'medium', 'high'] },
+                raw_email: { type: 'string', description: 'Raw client email text. If provided without a title, AI will parse it.' },
+            },
+        },
+    },
+    {
+        name: 'list_issues',
+        description: 'List issues for a project with optional status filter',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                project_id: { type: 'integer', description: 'Project ID' },
+                project_name: { type: 'string', description: 'Project name (fuzzy match)' },
+                status: { type: 'string', description: 'Filter by issue status', enum: ['open', 'in_progress', 'done'] },
+            },
+        },
+    },
+    {
+        name: 'update_issue',
+        description: 'Update an issue status, title, description, or urgency',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                id: { type: 'integer', description: 'Issue ID' },
+                title: { type: 'string', description: 'New issue title' },
+                description: { type: 'string', description: 'New issue description' },
+                status: { type: 'string', description: 'New issue status', enum: ['open', 'in_progress', 'done'] },
+                urgency: { type: 'string', description: 'New issue urgency', enum: ['low', 'medium', 'high'] },
+            },
+            required: ['id'],
+        },
+    },
+    {
+        name: 'sync_issues',
+        description: 'Sync issues with GitHub for a project that has a github_repo configured. Pulls new/updated issues from GitHub.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                project_id: { type: 'integer', description: 'Project ID' },
+                project_name: { type: 'string', description: 'Project name (fuzzy match)' },
+            },
+        },
     },
 ];
 
@@ -121,13 +276,13 @@ async function handleToolCall(name, args) {
 
     switch (name) {
         case 'list_projects': {
-            let sql = 'SELECT * FROM projects WHERE 1=1';
+            let sql = `SELECT p.*, (SELECT COUNT(*) FROM issues WHERE issues.project_id = p.id AND issues.status IN ('open', 'in_progress')) as open_issue_count FROM projects p WHERE 1=1`;
             const params = [];
-            if (args.type) { sql += ' AND type = ?'; params.push(args.type); }
-            if (args.status) { sql += ' AND status = ?'; params.push(args.status); }
-            if (args.money_status) { sql += ' AND money_status = ?'; params.push(args.money_status); }
-            if (args.waiting_on_client !== undefined) { sql += ' AND waiting_on_client = ?'; params.push(args.waiting_on_client ? 1 : 0); }
-            sql += ' ORDER BY CASE WHEN priority IS NULL THEN 1 ELSE 0 END, priority ASC, CASE WHEN money_status = "awaiting" THEN 0 ELSE 1 END, deadline ASC, money_value DESC, last_touched_at DESC';
+            if (args.type) { sql += ' AND p.type = ?'; params.push(args.type); }
+            if (args.status) { sql += ' AND p.status = ?'; params.push(args.status); }
+            if (args.money_status) { sql += ' AND p.money_status = ?'; params.push(args.money_status); }
+            if (args.waiting_on_client !== undefined) { sql += ' AND p.waiting_on_client = ?'; params.push(args.waiting_on_client ? 1 : 0); }
+            sql += ' ORDER BY CASE WHEN p.priority IS NULL THEN 1 ELSE 0 END, p.priority ASC, CASE WHEN p.money_status = "awaiting" THEN 0 ELSE 1 END, p.deadline ASC, p.money_value DESC, p.last_touched_at DESC';
             const [rows] = await conn.execute(sql, params);
             return {
                 count: rows.length,
@@ -142,6 +297,8 @@ async function handleToolCall(name, args) {
                     money_value: p.money_value,
                     deadline: p.deadline ? p.deadline.toISOString().split('T')[0] : null,
                     next_action: p.next_action,
+                    github_repo: p.github_repo,
+                    open_issue_count: p.open_issue_count,
                     last_touched: p.last_touched_at,
                 })),
             };
@@ -154,10 +311,21 @@ async function handleToolCall(name, args) {
                 'SELECT entry, created_at FROM project_logs WHERE project_id = ? ORDER BY created_at DESC LIMIT 10',
                 [project.id]
             );
+            const [[{ open_issue_count }]] = await conn.execute(
+                "SELECT COUNT(*) as open_issue_count FROM issues WHERE project_id = ? AND status IN ('open', 'in_progress')",
+                [project.id]
+            );
+            const [issues] = await conn.execute(
+                "SELECT id, title, status, urgency, github_issue_number, created_at FROM issues WHERE project_id = ? AND status IN ('open', 'in_progress') ORDER BY created_at DESC LIMIT 10",
+                [project.id]
+            );
             return {
                 ...project,
                 deadline: project.deadline ? project.deadline.toISOString().split('T')[0] : null,
+                github_repo: project.github_repo,
+                open_issue_count,
                 recent_logs: logs.map(l => ({ entry: l.entry, created_at: l.created_at })),
+                open_issues: issues.map(i => ({ id: i.id, title: i.title, status: i.status, urgency: i.urgency, github_issue_number: i.github_issue_number, created_at: i.created_at })),
             };
         }
 
@@ -165,9 +333,9 @@ async function handleToolCall(name, args) {
             if (!args.name) return { error: 'Name is required' };
             if (!args.type) return { error: 'Type is required' };
             const [result] = await conn.execute(
-                `INSERT INTO projects (name, type, status, waiting_on_client, priority, money_status, money_value, deadline, next_action, notes, last_touched_at, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW())`,
-                [args.name, args.type, args.status || 'active', args.waiting_on_client ? 1 : 0, args.priority || 0, args.money_status || 'none', args.money_value || null, args.deadline || null, args.next_action || null, args.notes || null]
+                `INSERT INTO projects (name, type, status, waiting_on_client, priority, money_status, money_value, deadline, next_action, notes, github_repo, last_touched_at, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW())`,
+                [args.name, args.type, args.status || 'active', args.waiting_on_client ? 1 : 0, args.priority || 0, args.money_status || 'none', args.money_value || null, args.deadline || null, args.next_action || null, args.notes || null, args.github_repo || null]
             );
             return { success: true, message: `Project '${args.name}' created`, id: result.insertId };
         }
@@ -187,6 +355,7 @@ async function handleToolCall(name, args) {
             if (args.deadline !== undefined) { updates.push('deadline = ?'); params.push(args.deadline || null); }
             if (args.next_action !== undefined) { updates.push('next_action = ?'); params.push(args.next_action || null); }
             if (args.notes !== undefined) { updates.push('notes = ?'); params.push(args.notes); }
+            if (args.github_repo !== undefined) { updates.push('github_repo = ?'); params.push(args.github_repo || null); }
             updates.push('last_touched_at = NOW()');
             updates.push('updated_at = NOW()');
             params.push(project.id);
@@ -218,12 +387,164 @@ async function handleToolCall(name, args) {
             const [[{ total_awaiting }]] = await conn.execute(
                 "SELECT COALESCE(SUM(money_value), 0) as total_awaiting FROM projects WHERE money_status = 'awaiting' AND status NOT IN ('complete', 'killed')"
             );
+            const [[{ open_issue_count }]] = await conn.execute(
+                "SELECT COUNT(*) as open_issue_count FROM issues WHERE status IN ('open', 'in_progress')"
+            );
             return {
                 active_projects: active_count,
                 blocked_projects: { count: blocked.length, projects: blocked },
                 upcoming_deadlines: { count: deadlines.length, projects: deadlines.map(p => ({ ...p, deadline: p.deadline?.toISOString().split('T')[0] })) },
                 awaiting_money: { count: awaiting.length, total_value: total_awaiting, projects: awaiting },
+                open_issues: open_issue_count,
             };
+        }
+
+        case 'create_issue': {
+            const project = await findProject({ id: args.project_id, name: args.project_name });
+            if (!project) return { error: 'Project not found' };
+
+            let title = args.title || null;
+            let description = args.description || null;
+            let urgency = args.urgency || 'medium';
+
+            if (args.raw_email && !title) {
+                const parsed = await parseEmail(args.raw_email);
+                title = parsed.title;
+                description = description || parsed.description;
+                urgency = parsed.urgency;
+            }
+
+            if (!title) return { error: 'Title is required (or provide raw_email for AI parsing)' };
+
+            const [result] = await conn.execute(
+                'INSERT INTO issues (project_id, title, description, status, urgency, raw_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())',
+                [project.id, title, description, 'open', urgency, args.raw_email || null]
+            );
+
+            // Push to GitHub if configured
+            let githubNumber = null;
+            if (project.github_repo && githubConfigured()) {
+                try {
+                    const ghIssue = await githubCreateIssue(project.github_repo, title, description);
+                    if (ghIssue && ghIssue.number) {
+                        await conn.execute('UPDATE issues SET github_issue_number = ? WHERE id = ?', [ghIssue.number, result.insertId]);
+                        githubNumber = ghIssue.number;
+                    }
+                } catch (e) { /* GitHub push failed — issue still created locally */ }
+            }
+
+            await conn.execute('UPDATE projects SET last_touched_at = NOW(), updated_at = NOW() WHERE id = ?', [project.id]);
+
+            return { success: true, message: `Issue created on '${project.name}'${githubNumber ? ` (GitHub #${githubNumber})` : ''}`, issue_id: result.insertId, title, urgency, github_issue_number: githubNumber };
+        }
+
+        case 'list_issues': {
+            const project = await findProject({ id: args.project_id, name: args.project_name });
+            if (!project) return { error: 'Project not found' };
+
+            let sql = 'SELECT id, title, description, status, urgency, github_issue_number, created_at FROM issues WHERE project_id = ?';
+            const params = [project.id];
+            if (args.status) { sql += ' AND status = ?'; params.push(args.status); }
+            sql += ' ORDER BY created_at DESC';
+
+            const [issues] = await conn.execute(sql, params);
+            return {
+                project: project.name,
+                count: issues.length,
+                issues: issues.map(i => ({ id: i.id, title: i.title, description: i.description, status: i.status, urgency: i.urgency, github_issue_number: i.github_issue_number, created_at: i.created_at })),
+            };
+        }
+
+        case 'update_issue': {
+            if (!args.id) return { error: 'Issue ID is required' };
+            const [issueRows] = await conn.execute('SELECT * FROM issues WHERE id = ?', [args.id]);
+            if (!issueRows[0]) return { error: 'Issue not found' };
+            const issue = issueRows[0];
+
+            const updates = [];
+            const params = [];
+            if (args.title !== undefined) { updates.push('title = ?'); params.push(args.title); }
+            if (args.description !== undefined) { updates.push('description = ?'); params.push(args.description); }
+            if (args.status !== undefined) { updates.push('status = ?'); params.push(args.status); }
+            if (args.urgency !== undefined) { updates.push('urgency = ?'); params.push(args.urgency); }
+            updates.push('updated_at = NOW()');
+            params.push(issue.id);
+
+            const oldStatus = issue.status;
+            await conn.execute(`UPDATE issues SET ${updates.join(', ')} WHERE id = ?`, params);
+            await conn.execute('UPDATE projects SET last_touched_at = NOW(), updated_at = NOW() WHERE id = ?', [issue.project_id]);
+
+            // Push status change to GitHub
+            if (args.status && issue.github_issue_number) {
+                const [projRows] = await conn.execute('SELECT github_repo FROM projects WHERE id = ?', [issue.project_id]);
+                const repo = projRows[0]?.github_repo;
+                if (repo && githubConfigured()) {
+                    try {
+                        if (args.status === 'done' && oldStatus !== 'done') {
+                            await githubCloseIssue(repo, issue.github_issue_number);
+                        } else if (args.status !== 'done' && oldStatus === 'done') {
+                            await githubReopenIssue(repo, issue.github_issue_number);
+                        }
+                    } catch (e) { /* GitHub sync failed silently */ }
+                }
+            }
+
+            return { success: true, message: `Issue '${issue.title}' updated`, id: issue.id };
+        }
+
+        case 'sync_issues': {
+            const project = await findProject({ id: args.project_id, name: args.project_name });
+            if (!project) return { error: 'Project not found' };
+            if (!project.github_repo) return { error: 'Project has no GitHub repo configured' };
+            if (!githubConfigured()) return { error: 'GITHUB_TOKEN not configured' };
+
+            let ghIssues;
+            try {
+                ghIssues = await githubListIssues(project.github_repo);
+            } catch (e) {
+                return { error: 'Failed to fetch GitHub issues: ' + e.message };
+            }
+
+            let created = 0, updated = 0;
+
+            for (const ghIssue of ghIssues) {
+                const number = ghIssue.number;
+                const [existing] = await conn.execute(
+                    'SELECT * FROM issues WHERE project_id = ? AND github_issue_number = ?',
+                    [project.id, number]
+                );
+                const ghStatus = ghIssue.state === 'closed' ? 'done' : 'open';
+
+                if (existing[0]) {
+                    const local = existing[0];
+                    const updates = [];
+                    const params = [];
+                    if (local.title !== ghIssue.title) {
+                        updates.push('title = ?'); params.push(ghIssue.title);
+                        updated++;
+                    }
+                    if (ghStatus === 'done' && local.status !== 'done') {
+                        updates.push('status = ?'); params.push('done');
+                        updated++;
+                    } else if (ghStatus === 'open' && local.status === 'done') {
+                        updates.push('status = ?'); params.push('open');
+                        updated++;
+                    }
+                    if (updates.length > 0) {
+                        updates.push('updated_at = NOW()');
+                        params.push(local.id);
+                        await conn.execute(`UPDATE issues SET ${updates.join(', ')} WHERE id = ?`, params);
+                    }
+                } else {
+                    await conn.execute(
+                        'INSERT INTO issues (project_id, title, description, status, urgency, github_issue_number, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())',
+                        [project.id, ghIssue.title, ghIssue.body || null, ghStatus, 'medium', number]
+                    );
+                    created++;
+                }
+            }
+
+            return { success: true, message: `Synced issues for '${project.name}': ${created} created, ${updated} updated`, created, updated, total_github_issues: ghIssues.length };
         }
 
         default:

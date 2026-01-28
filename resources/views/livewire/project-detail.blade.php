@@ -70,7 +70,7 @@
                             </div>
 
                             <div>
-                                <label for="money_value" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Value (£)</label>
+                                <label for="money_value" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Value (&pound;)</label>
                                 <input type="number" step="0.01" wire:model="money_value" id="money_value" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="0.00">
                             </div>
                         </div>
@@ -93,6 +93,18 @@
                         </div>
 
                         <div>
+                            <label for="github_repo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">GitHub Repo</label>
+                            <div class="flex gap-2 items-center">
+                                <input type="text" wire:model="github_repo" id="github_repo" placeholder="org/repo" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                @if($project->github_repo)
+                                    <a href="https://github.com/{{ $project->github_repo }}" target="_blank" class="mt-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm whitespace-nowrap">
+                                        View &rarr;
+                                    </a>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div>
                             <label class="inline-flex items-center cursor-pointer">
                                 <input type="checkbox" wire:model.live="is_retainer" class="rounded border-gray-300 dark:border-gray-700 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:bg-gray-900">
                                 <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Retainer client</span>
@@ -112,7 +124,7 @@
                                 </div>
 
                                 <div>
-                                    <label for="retainer_amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Retainer Amount (£)</label>
+                                    <label for="retainer_amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Retainer Amount (&pound;)</label>
                                     <input type="number" step="0.01" wire:model="retainer_amount" id="retainer_amount" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="0.00">
                                 </div>
                             </div>
@@ -124,6 +136,171 @@
                             </button>
                         </div>
                     </form>
+                </div>
+
+                <!-- Issues Section -->
+                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mt-6">
+                    <div class="p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+                                Issues
+                                @if($issues->where('status', '!=', \App\Enums\IssueStatus::Done)->count() > 0)
+                                    <span class="ml-2 px-2 py-0.5 text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300 rounded-full">
+                                        {{ $issues->where('status', '!=', \App\Enums\IssueStatus::Done)->count() }} open
+                                    </span>
+                                @endif
+                            </h3>
+                            <div class="flex gap-2">
+                                @if($project->github_repo && \App\Services\GitHubService::isConfigured())
+                                    <button
+                                        wire:click="syncGitHubIssues"
+                                        wire:loading.attr="disabled"
+                                        wire:target="syncGitHubIssues"
+                                        class="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+                                    >
+                                        <span wire:loading.remove wire:target="syncGitHubIssues">Sync from GitHub</span>
+                                        <span wire:loading wire:target="syncGitHubIssues">Syncing...</span>
+                                    </button>
+                                @endif
+                                <button
+                                    wire:click="$toggle('showIssueForm')"
+                                    class="px-3 py-1.5 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-500"
+                                >
+                                    {{ $showIssueForm ? 'Cancel' : 'Add Issue from Email' }}
+                                </button>
+                            </div>
+                        </div>
+
+                        @if(session('issue-message'))
+                            <div class="mb-4 p-3 bg-green-100 dark:bg-green-900 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-300 rounded text-sm">
+                                {{ session('issue-message') }}
+                            </div>
+                        @endif
+
+                        @if($showIssueForm)
+                            <div class="mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Paste client email</label>
+                                    <textarea
+                                        wire:model="newIssueEmail"
+                                        rows="5"
+                                        class="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                        placeholder="Paste the client's email here..."
+                                    ></textarea>
+                                    <button
+                                        wire:click="parseEmail"
+                                        wire:loading.attr="disabled"
+                                        wire:target="parseEmail"
+                                        class="mt-2 px-3 py-1.5 text-sm font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 rounded-md hover:bg-indigo-200 dark:hover:bg-indigo-900 disabled:opacity-50"
+                                    >
+                                        <span wire:loading.remove wire:target="parseEmail">Parse with AI</span>
+                                        <span wire:loading wire:target="parseEmail">Parsing...</span>
+                                    </button>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title *</label>
+                                    <input
+                                        type="text"
+                                        wire:model="newIssueTitle"
+                                        class="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                        placeholder="Issue title..."
+                                    >
+                                    @error('newIssueTitle') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                                    <textarea
+                                        wire:model="newIssueDescription"
+                                        rows="3"
+                                        class="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                        placeholder="Action items..."
+                                    ></textarea>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Urgency</label>
+                                    <select
+                                        wire:model="newIssueUrgency"
+                                        class="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                    >
+                                        @foreach($issueUrgencies as $u)
+                                            <option value="{{ $u->value }}">{{ $u->label() }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="flex justify-end">
+                                    <button
+                                        wire:click="createIssue"
+                                        class="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-500"
+                                    >
+                                        Create Issue
+                                    </button>
+                                </div>
+                            </div>
+                        @endif
+
+                        <!-- Issue List -->
+                        <div class="space-y-3">
+                            @forelse($issues as $issue)
+                                <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-3 {{ $issue->status === \App\Enums\IssueStatus::Done ? 'opacity-60' : '' }}" x-data="{ expanded: false }">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                                            <button @click="expanded = !expanded" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0">
+                                                <svg class="w-4 h-4 transition-transform" :class="expanded && 'rotate-90'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                                </svg>
+                                            </button>
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate {{ $issue->status === \App\Enums\IssueStatus::Done ? 'line-through' : '' }}">
+                                                {{ $issue->title }}
+                                            </span>
+                                            @php
+                                                $urgencyColors = [
+                                                    'gray' => 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+                                                    'yellow' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+                                                    'red' => 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+                                                ];
+                                            @endphp
+                                            <span class="px-1.5 py-0.5 text-xs rounded {{ $urgencyColors[$issue->urgency->color()] }} shrink-0">
+                                                {{ $issue->urgency->label() }}
+                                            </span>
+                                            @if($issue->github_issue_number && $project->github_repo)
+                                                <a href="https://github.com/{{ $project->github_repo }}/issues/{{ $issue->github_issue_number }}" target="_blank" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0" title="View on GitHub">
+                                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                                                </a>
+                                            @elseif($project->github_repo && !$issue->github_issue_number)
+                                                <span class="text-xs text-gray-400 dark:text-gray-500 shrink-0">(local)</span>
+                                            @endif
+                                        </div>
+                                        <select
+                                            wire:change="updateIssueStatus({{ $issue->id }}, $event.target.value)"
+                                            class="text-xs rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 py-1 pl-2 pr-6 shrink-0"
+                                        >
+                                            @foreach($issueStatuses as $is)
+                                                <option value="{{ $is->value }}" {{ $issue->status === $is ? 'selected' : '' }}>{{ $is->label() }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div x-show="expanded" x-collapse class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                        @if($issue->description)
+                                            <div class="whitespace-pre-wrap mb-2">{{ $issue->description }}</div>
+                                        @endif
+                                        @if($issue->raw_email)
+                                            <details class="mt-2">
+                                                <summary class="text-xs text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300">Original email</summary>
+                                                <div class="mt-1 p-2 bg-gray-100 dark:bg-gray-900 rounded text-xs whitespace-pre-wrap">{{ $issue->raw_email }}</div>
+                                            </details>
+                                        @endif
+                                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-2">{{ $issue->created_at->format('j M Y, g:ia') }}</p>
+                                    </div>
+                                </div>
+                            @empty
+                                <p class="text-sm text-gray-500 dark:text-gray-400 italic">No issues yet.</p>
+                            @endforelse
+                        </div>
+                    </div>
                 </div>
             </div>
 
