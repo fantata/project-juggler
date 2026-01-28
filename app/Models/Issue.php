@@ -6,6 +6,7 @@ use App\Enums\IssueStatus;
 use App\Enums\IssueUrgency;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Issue extends Model
 {
@@ -30,5 +31,20 @@ class Issue extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(IssueTask::class)->orderBy('position');
+    }
+
+    public function completedTasksCount(): int
+    {
+        return $this->tasks()->where('is_complete', true)->count();
+    }
+
+    public function totalTasksCount(): int
+    {
+        return $this->tasks()->count();
     }
 }
