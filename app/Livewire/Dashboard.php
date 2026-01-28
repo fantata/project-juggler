@@ -30,7 +30,12 @@ class Dashboard extends Component
 
     public function render()
     {
+        $issueCountQuery = ['issues as open_issue_count' => function ($q) {
+            $q->whereIn('status', ['open', 'in_progress']);
+        }];
+
         $baseQuery = Project::query()
+            ->withCount($issueCountQuery)
             ->whereNotIn('status', ['complete', 'killed']);
 
         if ($this->filterType) {
@@ -43,9 +48,11 @@ class Dashboard extends Component
 
         // Active projects (ball in your court, non-retainer)
         // Priority: lower number = higher priority, NULL = unprioritized (at bottom)
+        // Projects with open issues float to the top
         $activeProjects = (clone $baseQuery)
             ->where('waiting_on_client', false)
             ->where('is_retainer', false)
+            ->orderByRaw("(SELECT COUNT(*) FROM issues WHERE issues.project_id = projects.id AND issues.status IN ('open', 'in_progress')) > 0 DESC")
             ->orderByRaw("CASE WHEN priority IS NULL THEN 1 ELSE 0 END")
             ->orderBy('priority', 'asc')
             ->orderByRaw("CASE WHEN money_status = 'awaiting' THEN 0 ELSE 1 END")
@@ -56,6 +63,7 @@ class Dashboard extends Component
         // Retainer projects (ongoing retainer clients)
         $retainerProjects = (clone $baseQuery)
             ->where('is_retainer', true)
+            ->orderByRaw("(SELECT COUNT(*) FROM issues WHERE issues.project_id = projects.id AND issues.status IN ('open', 'in_progress')) > 0 DESC")
             ->orderByRaw("CASE WHEN priority IS NULL THEN 1 ELSE 0 END")
             ->orderBy('priority', 'asc')
             ->orderBy('name', 'asc')
@@ -65,6 +73,7 @@ class Dashboard extends Component
         $waitingProjects = (clone $baseQuery)
             ->where('waiting_on_client', true)
             ->where('is_retainer', false)
+            ->orderByRaw("(SELECT COUNT(*) FROM issues WHERE issues.project_id = projects.id AND issues.status IN ('open', 'in_progress')) > 0 DESC")
             ->orderByRaw("CASE WHEN priority IS NULL THEN 1 ELSE 0 END")
             ->orderBy('priority', 'asc')
             ->orderBy('last_touched_at', 'desc')
@@ -74,6 +83,7 @@ class Dashboard extends Component
         $completedProjects = collect();
         if ($this->showCompleted) {
             $completedQuery = Project::query()
+                ->withCount($issueCountQuery)
                 ->whereIn('status', ['complete', 'killed']);
 
             if ($this->filterType) {

@@ -5,7 +5,10 @@ namespace App\Console\Commands;
 use App\Enums\MoneyStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProjectType;
+use App\Models\Issue;
 use App\Models\Project;
+use App\Services\EmailParser;
+use App\Services\GitHubService;
 use Illuminate\Console\Command;
 
 class McpServer extends Command
@@ -96,6 +99,10 @@ class McpServer extends Command
                         'type' => 'string',
                         'description' => 'Project notes',
                     ],
+                    'github_repo' => [
+                        'type' => 'string',
+                        'description' => 'GitHub repository (org/repo format)',
+                    ],
                 ],
                 'required' => ['name', 'type'],
             ],
@@ -149,6 +156,10 @@ class McpServer extends Command
                         'type' => 'string',
                         'description' => 'Project notes',
                     ],
+                    'github_repo' => [
+                        'type' => 'string',
+                        'description' => 'GitHub repository (org/repo format, use empty string to clear)',
+                    ],
                 ],
             ],
         ],
@@ -176,10 +187,115 @@ class McpServer extends Command
         ],
         [
             'name' => 'quick_status',
-            'description' => 'Get a quick overview: active projects count, blocked projects, upcoming deadlines, projects awaiting money',
+            'description' => 'Get a quick overview: active projects count, blocked projects, upcoming deadlines, projects awaiting money, open issues',
             'inputSchema' => [
                 'type' => 'object',
                 'properties' => [],
+            ],
+        ],
+        [
+            'name' => 'create_issue',
+            'description' => 'Create an issue/ticket on a project. Either provide a title directly, or provide raw_email to have AI parse it into a structured issue.',
+            'inputSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'project_id' => [
+                        'type' => 'integer',
+                        'description' => 'Project ID',
+                    ],
+                    'project_name' => [
+                        'type' => 'string',
+                        'description' => 'Project name (fuzzy match, used if project_id not provided)',
+                    ],
+                    'title' => [
+                        'type' => 'string',
+                        'description' => 'Issue title (optional if raw_email provided)',
+                    ],
+                    'description' => [
+                        'type' => 'string',
+                        'description' => 'Issue description / action items',
+                    ],
+                    'urgency' => [
+                        'type' => 'string',
+                        'description' => 'Issue urgency',
+                        'enum' => ['low', 'medium', 'high'],
+                    ],
+                    'raw_email' => [
+                        'type' => 'string',
+                        'description' => 'Raw client email text. If provided without a title, AI will parse it to extract title, description, and urgency.',
+                    ],
+                ],
+            ],
+        ],
+        [
+            'name' => 'list_issues',
+            'description' => 'List issues for a project with optional status filter',
+            'inputSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'project_id' => [
+                        'type' => 'integer',
+                        'description' => 'Project ID',
+                    ],
+                    'project_name' => [
+                        'type' => 'string',
+                        'description' => 'Project name (fuzzy match)',
+                    ],
+                    'status' => [
+                        'type' => 'string',
+                        'description' => 'Filter by issue status',
+                        'enum' => ['open', 'in_progress', 'done'],
+                    ],
+                ],
+            ],
+        ],
+        [
+            'name' => 'update_issue',
+            'description' => 'Update an issue status, title, description, or urgency',
+            'inputSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'id' => [
+                        'type' => 'integer',
+                        'description' => 'Issue ID',
+                    ],
+                    'title' => [
+                        'type' => 'string',
+                        'description' => 'New issue title',
+                    ],
+                    'description' => [
+                        'type' => 'string',
+                        'description' => 'New issue description',
+                    ],
+                    'status' => [
+                        'type' => 'string',
+                        'description' => 'New issue status',
+                        'enum' => ['open', 'in_progress', 'done'],
+                    ],
+                    'urgency' => [
+                        'type' => 'string',
+                        'description' => 'New issue urgency',
+                        'enum' => ['low', 'medium', 'high'],
+                    ],
+                ],
+                'required' => ['id'],
+            ],
+        ],
+        [
+            'name' => 'sync_issues',
+            'description' => 'Sync issues with GitHub for a project that has a github_repo configured. Pulls new/updated issues from GitHub and creates/updates them locally.',
+            'inputSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'project_id' => [
+                        'type' => 'integer',
+                        'description' => 'Project ID',
+                    ],
+                    'project_name' => [
+                        'type' => 'string',
+                        'description' => 'Project name (fuzzy match)',
+                    ],
+                ],
             ],
         ],
     ];
@@ -277,6 +393,10 @@ class McpServer extends Command
             'update_project' => $this->toolUpdateProject($arguments),
             'log_work' => $this->toolLogWork($arguments),
             'quick_status' => $this->toolQuickStatus(),
+            'create_issue' => $this->toolCreateIssue($arguments),
+            'list_issues' => $this->toolListIssues($arguments),
+            'update_issue' => $this->toolUpdateIssue($arguments),
+            'sync_issues' => $this->toolSyncIssues($arguments),
             default => ['error' => "Unknown tool: {$toolName}"],
         };
 
@@ -296,7 +416,10 @@ class McpServer extends Command
 
     private function toolListProjects(array $args): array
     {
-        $query = Project::query();
+        $query = Project::query()
+            ->withCount(['issues as open_issue_count' => function ($q) {
+                $q->whereIn('status', ['open', 'in_progress']);
+            }]);
 
         if (!empty($args['type'])) {
             $query->where('type', $args['type']);
@@ -321,6 +444,8 @@ class McpServer extends Command
                 'money_value' => $p->money_value,
                 'deadline' => $p->deadline?->format('Y-m-d'),
                 'next_action' => $p->next_action,
+                'github_repo' => $p->github_repo,
+                'open_issue_count' => $p->open_issue_count,
                 'last_touched' => $p->last_touched_at?->diffForHumans(),
             ])->toArray(),
         ];
@@ -335,6 +460,12 @@ class McpServer extends Command
         }
 
         $logs = $project->logs()->orderByDesc('created_at')->limit(10)->get();
+        $openIssueCount = $project->issues()->whereIn('status', ['open', 'in_progress'])->count();
+        $issues = $project->issues()
+            ->whereIn('status', ['open', 'in_progress'])
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get();
 
         return [
             'id' => $project->id,
@@ -346,11 +477,21 @@ class McpServer extends Command
             'deadline' => $project->deadline?->format('Y-m-d'),
             'next_action' => $project->next_action,
             'notes' => $project->notes,
+            'github_repo' => $project->github_repo,
+            'open_issue_count' => $openIssueCount,
             'last_touched_at' => $project->last_touched_at?->format('Y-m-d H:i:s'),
             'created_at' => $project->created_at->format('Y-m-d H:i:s'),
             'recent_logs' => $logs->map(fn($l) => [
                 'entry' => $l->entry,
                 'created_at' => $l->created_at->format('Y-m-d H:i:s'),
+            ])->toArray(),
+            'open_issues' => $issues->map(fn($i) => [
+                'id' => $i->id,
+                'title' => $i->title,
+                'status' => $i->status->value,
+                'urgency' => $i->urgency->value,
+                'github_issue_number' => $i->github_issue_number,
+                'created_at' => $i->created_at->format('Y-m-d H:i:s'),
             ])->toArray(),
         ];
     }
@@ -373,6 +514,7 @@ class McpServer extends Command
             'deadline' => !empty($args['deadline']) ? $args['deadline'] : null,
             'next_action' => $args['next_action'] ?? null,
             'notes' => $args['notes'] ?? null,
+            'github_repo' => $args['github_repo'] ?? null,
             'last_touched_at' => now(),
         ]);
 
@@ -416,6 +558,9 @@ class McpServer extends Command
         }
         if (isset($args['notes'])) {
             $updates['notes'] = $args['notes'];
+        }
+        if (array_key_exists('github_repo', $args)) {
+            $updates['github_repo'] = !empty($args['github_repo']) ? $args['github_repo'] : null;
         }
 
         $updates['last_touched_at'] = now();
@@ -498,6 +643,8 @@ class McpServer extends Command
             ->whereNotIn('status', ['complete', 'killed'])
             ->sum('money_value');
 
+        $openIssueCount = Issue::whereIn('status', ['open', 'in_progress'])->count();
+
         return [
             'active_projects' => $activeCount,
             'blocked_projects' => [
@@ -513,6 +660,222 @@ class McpServer extends Command
                 'total_value' => $totalAwaiting,
                 'projects' => $awaitingMoney,
             ],
+            'open_issues' => $openIssueCount,
+        ];
+    }
+
+    private function toolCreateIssue(array $args): array
+    {
+        $project = $this->findProject([
+            'id' => $args['project_id'] ?? null,
+            'name' => $args['project_name'] ?? null,
+        ]);
+
+        if (!$project) {
+            return ['error' => 'Project not found'];
+        }
+
+        $title = $args['title'] ?? null;
+        $description = $args['description'] ?? null;
+        $urgency = $args['urgency'] ?? 'medium';
+
+        if (!empty($args['raw_email']) && empty($title)) {
+            $parsed = EmailParser::parse($args['raw_email']);
+            $title = $parsed['title'];
+            $description = $description ?? $parsed['description'];
+            $urgency = $parsed['urgency'];
+        }
+
+        if (empty($title)) {
+            return ['error' => 'Title is required (or provide raw_email for AI parsing)'];
+        }
+
+        $issue = $project->issues()->create([
+            'title' => $title,
+            'description' => $description,
+            'status' => 'open',
+            'urgency' => $urgency,
+            'raw_email' => $args['raw_email'] ?? null,
+        ]);
+
+        // Push to GitHub if configured
+        $githubNumber = null;
+        if ($project->github_repo && GitHubService::isConfigured()) {
+            try {
+                $ghIssue = GitHubService::createIssue($project->github_repo, $title, $description);
+                if (!empty($ghIssue['number'])) {
+                    $issue->update(['github_issue_number' => $ghIssue['number']]);
+                    $githubNumber = $ghIssue['number'];
+                }
+            } catch (\Exception $e) {
+                // GitHub push failed — issue still created locally
+            }
+        }
+
+        $project->update(['last_touched_at' => now()]);
+
+        return [
+            'success' => true,
+            'message' => "Issue created on '{$project->name}'" . ($githubNumber ? " (GitHub #$githubNumber)" : ''),
+            'issue_id' => $issue->id,
+            'title' => $issue->title,
+            'urgency' => $urgency,
+            'github_issue_number' => $githubNumber,
+        ];
+    }
+
+    private function toolListIssues(array $args): array
+    {
+        $project = $this->findProject([
+            'id' => $args['project_id'] ?? null,
+            'name' => $args['project_name'] ?? null,
+        ]);
+
+        if (!$project) {
+            return ['error' => 'Project not found'];
+        }
+
+        $query = $project->issues();
+
+        if (!empty($args['status'])) {
+            $query->where('status', $args['status']);
+        }
+
+        $issues = $query->orderByDesc('created_at')->get();
+
+        return [
+            'project' => $project->name,
+            'count' => $issues->count(),
+            'issues' => $issues->map(fn($i) => [
+                'id' => $i->id,
+                'title' => $i->title,
+                'description' => $i->description,
+                'status' => $i->status->value,
+                'urgency' => $i->urgency->value,
+                'github_issue_number' => $i->github_issue_number,
+                'created_at' => $i->created_at->format('Y-m-d H:i:s'),
+            ])->toArray(),
+        ];
+    }
+
+    private function toolUpdateIssue(array $args): array
+    {
+        if (empty($args['id'])) {
+            return ['error' => 'Issue ID is required'];
+        }
+
+        $issue = Issue::find($args['id']);
+
+        if (!$issue) {
+            return ['error' => 'Issue not found'];
+        }
+
+        $updates = [];
+
+        if (isset($args['title'])) {
+            $updates['title'] = $args['title'];
+        }
+        if (isset($args['description'])) {
+            $updates['description'] = $args['description'];
+        }
+        if (isset($args['status'])) {
+            $updates['status'] = $args['status'];
+        }
+        if (isset($args['urgency'])) {
+            $updates['urgency'] = $args['urgency'];
+        }
+
+        $oldStatus = $issue->status->value;
+        $issue->update($updates);
+        $issue->project->update(['last_touched_at' => now()]);
+
+        // Push status change to GitHub
+        if (isset($args['status']) && $issue->github_issue_number && $issue->project->github_repo && GitHubService::isConfigured()) {
+            try {
+                if ($args['status'] === 'done' && $oldStatus !== 'done') {
+                    GitHubService::closeIssue($issue->project->github_repo, $issue->github_issue_number);
+                } elseif ($args['status'] !== 'done' && $oldStatus === 'done') {
+                    GitHubService::reopenIssue($issue->project->github_repo, $issue->github_issue_number);
+                }
+            } catch (\Exception $e) {
+                // GitHub sync failed silently
+            }
+        }
+
+        return [
+            'success' => true,
+            'message' => "Issue '{$issue->title}' updated",
+            'id' => $issue->id,
+        ];
+    }
+
+    private function toolSyncIssues(array $args): array
+    {
+        $project = $this->findProject([
+            'id' => $args['project_id'] ?? null,
+            'name' => $args['project_name'] ?? null,
+        ]);
+
+        if (!$project) {
+            return ['error' => 'Project not found'];
+        }
+
+        if (!$project->github_repo) {
+            return ['error' => 'Project has no GitHub repo configured'];
+        }
+
+        if (!GitHubService::isConfigured()) {
+            return ['error' => 'GITHUB_TOKEN not configured'];
+        }
+
+        try {
+            $ghIssues = GitHubService::listIssues($project->github_repo);
+        } catch (\Exception $e) {
+            return ['error' => 'Failed to fetch GitHub issues: ' . $e->getMessage()];
+        }
+
+        $created = 0;
+        $updated = 0;
+
+        foreach ($ghIssues as $ghIssue) {
+            $number = $ghIssue['number'];
+            $existing = $project->issues()
+                ->where('github_issue_number', $number)
+                ->first();
+
+            $ghStatus = $ghIssue['state'] === 'closed' ? 'done' : 'open';
+
+            if ($existing) {
+                $updates = ['title' => $ghIssue['title']];
+                if ($ghStatus === 'done' && $existing->status->value !== 'done') {
+                    $updates['status'] = 'done';
+                    $updated++;
+                } elseif ($ghStatus === 'open' && $existing->status->value === 'done') {
+                    $updates['status'] = 'open';
+                    $updated++;
+                }
+                if ($existing->title !== $ghIssue['title']) {
+                    $updated++;
+                }
+                $existing->update($updates);
+            } else {
+                $project->issues()->create([
+                    'title' => $ghIssue['title'],
+                    'description' => $ghIssue['body'] ?? null,
+                    'status' => $ghStatus,
+                    'urgency' => 'medium',
+                    'github_issue_number' => $number,
+                ]);
+                $created++;
+            }
+        }
+
+        return [
+            'success' => true,
+            'message' => "Synced issues for '{$project->name}': {$created} created, {$updated} updated",
+            'created' => $created,
+            'updated' => $updated,
+            'total_github_issues' => count($ghIssues),
         ];
     }
 

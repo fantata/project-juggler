@@ -25,6 +25,7 @@ class Project extends Model
         'deadline',
         'next_action',
         'notes',
+        'github_repo',
         'last_touched_at',
     ];
 
@@ -48,6 +49,11 @@ class Project extends Model
     public function logs(): HasMany
     {
         return $this->hasMany(ProjectLog::class)->orderByDesc('created_at');
+    }
+
+    public function issues(): HasMany
+    {
+        return $this->hasMany(Issue::class)->orderByDesc('created_at');
     }
 
     public function markTouched(): bool
