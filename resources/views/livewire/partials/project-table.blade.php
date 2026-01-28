@@ -15,9 +15,6 @@
                     <a href="{{ route('projects.show', $project) }}" class="text-gray-900 dark:text-gray-100 font-medium hover:text-gray-600 dark:hover:text-gray-300">
                         {{ $project->name }}
                     </a>
-                    @if($project->priority > 0)
-                        <span class="ml-2 px-1.5 py-0.5 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 rounded">P{{ $project->priority }}</span>
-                    @endif
                     @if($project->open_issue_count > 0)
                         <span class="ml-1 px-1.5 py-0.5 text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300 rounded-full">{{ $project->open_issue_count }} {{ Str::plural('issue', $project->open_issue_count) }}</span>
                     @endif
