@@ -8,9 +8,37 @@
                 </span>
             @endif
         </h2>
-        <a href="{{ route('dashboard') }}" wire:navigate class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
-            Back to Projects
-        </a>
+        <div class="flex items-center gap-3">
+            @if($tasksByProject->count() > 0)
+                <button
+                    x-data
+                    @click="
+                        const text = document.getElementById('tasks-for-copy').innerText;
+                        navigator.clipboard.writeText(text).then(() => {
+                            $el.querySelector('.copy-icon').classList.add('hidden');
+                            $el.querySelector('.check-icon').classList.remove('hidden');
+                            setTimeout(() => {
+                                $el.querySelector('.copy-icon').classList.remove('hidden');
+                                $el.querySelector('.check-icon').classList.add('hidden');
+                            }, 2000);
+                        });
+                    "
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+                    title="Copy tasks for AI"
+                >
+                    <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                    <svg class="w-4 h-4 check-icon hidden text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Copy for AI
+                </button>
+            @endif
+            <a href="{{ route('dashboard') }}" wire:navigate class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
+                Back to Projects
+            </a>
+        </div>
     </div>
 </x-slot>
 
@@ -110,5 +138,16 @@
                 </div>
             </div>
         @endforelse
+
+        <!-- Hidden element for copy -->
+        <div id="tasks-for-copy" class="sr-only" aria-hidden="true">Here are my current tasks:
+@foreach($tasksByProject as $projectName => $tasks)
+
+## {{ $projectName }}
+@foreach($tasks->where('is_complete', false) as $task)
+- [ ] {{ $task->description }} ({{ $task->issue->title }})
+@endforeach
+@endforeach
+        </div>
     </div>
 </div>
