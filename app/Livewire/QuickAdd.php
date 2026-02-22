@@ -33,6 +33,8 @@ class QuickAdd extends Component
     #[Validate('nullable|string|max:255')]
     public ?string $next_action = null;
 
+    public string $category = 'consultancy';
+
     public bool $is_retainer = false;
 
     public ?string $retainer_frequency = null;
@@ -47,6 +49,7 @@ class QuickAdd extends Component
         Project::create([
             'name' => $this->name,
             'type' => $this->type,
+            'category' => $this->category,
             'status' => $this->status,
             'money_status' => $this->money_status,
             'money_value' => $this->money_value ?: null,
@@ -70,6 +73,7 @@ class QuickAdd extends Component
             'statuses' => ProjectStatus::cases(),
             'moneyStatuses' => MoneyStatus::cases(),
             'retainerFrequencies' => RetainerFrequency::cases(),
+            'categories' => config('project-categories'),
         ]);
     }
 }

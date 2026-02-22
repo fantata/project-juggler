@@ -39,12 +39,21 @@
                             @error('name') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                         </div>
 
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-3 gap-4">
                             <div>
                                 <label for="type" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Type *</label>
                                 <select wire:model="type" id="type" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                     @foreach($types as $t)
                                         <option value="{{ $t->value }}">{{ $t->label() }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="category" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
+                                <select wire:model.live="category" id="category" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    @foreach($categories as $catKey => $catConfig)
+                                        <option value="{{ $catKey }}">{{ $catConfig['label'] }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -59,6 +68,7 @@
                             </div>
                         </div>
 
+                        @if(in_array('money_status', $categoryConfig['show_fields'] ?? []))
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="money_status" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Money Status</label>
@@ -74,6 +84,7 @@
                                 <input type="number" step="0.01" wire:model="money_value" id="money_value" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="0.00">
                             </div>
                         </div>
+                        @endif
 
                         <div class="grid grid-cols-2 gap-4">
                             <div>
@@ -92,6 +103,7 @@
                             <textarea wire:model="notes" id="notes" rows="4" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Project notes..."></textarea>
                         </div>
 
+                        @if(in_array('github_repo', $categoryConfig['show_fields'] ?? []))
                         <div>
                             <label for="github_repo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">GitHub Repo</label>
                             <div class="flex gap-2 items-center">
@@ -103,7 +115,9 @@
                                 @endif
                             </div>
                         </div>
+                        @endif
 
+                        @if(in_array('is_retainer', $categoryConfig['show_fields'] ?? []))
                         <div>
                             <label class="inline-flex items-center cursor-pointer">
                                 <input type="checkbox" wire:model.live="is_retainer" class="rounded border-gray-300 dark:border-gray-700 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:bg-gray-900">
@@ -129,6 +143,43 @@
                                 </div>
                             </div>
                         @endif
+                        @endif
+
+                        {{-- Dynamic Meta Fields based on category --}}
+                        @if(!empty($categoryConfig['meta_fields']))
+                            <div class="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg space-y-3">
+                                <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400">{{ $categoryConfig['label'] }} Details</h4>
+                                <div class="grid grid-cols-2 gap-4">
+                                    @foreach($categoryConfig['meta_fields'] as $fieldKey => $fieldConfig)
+                                        <div class="{{ $fieldConfig['type'] === 'textarea' ? 'col-span-2' : '' }}">
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ $fieldConfig['label'] }}</label>
+                                            @if($fieldConfig['type'] === 'select')
+                                                <select wire:model="meta.{{ $fieldKey }}" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                                    <option value="">Select...</option>
+                                                    @foreach($fieldConfig['options'] as $option)
+                                                        <option value="{{ $option }}">{{ ucfirst($option) }}</option>
+                                                    @endforeach
+                                                </select>
+                                            @elseif($fieldConfig['type'] === 'textarea')
+                                                <textarea wire:model="meta.{{ $fieldKey }}" rows="3" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
+                                            @elseif($fieldConfig['type'] === 'integer')
+                                                <input type="number" wire:model="meta.{{ $fieldKey }}" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                            @elseif($fieldConfig['type'] === 'decimal')
+                                                <input type="number" step="0.01" wire:model="meta.{{ $fieldKey }}" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                            @elseif($fieldConfig['type'] === 'date')
+                                                <input type="date" wire:model="meta.{{ $fieldKey }}" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                            @elseif($fieldConfig['type'] === 'datetime')
+                                                <input type="datetime-local" wire:model="meta.{{ $fieldKey }}" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                            @elseif($fieldConfig['type'] === 'email')
+                                                <input type="email" wire:model="meta.{{ $fieldKey }}" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                            @else
+                                                <input type="text" wire:model="meta.{{ $fieldKey }}" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
 
                         <div class="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
                             <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-gray-800 dark:bg-gray-200 dark:text-gray-800 border border-transparent rounded-md hover:bg-gray-700 dark:hover:bg-white">
@@ -143,7 +194,7 @@
                     <div class="p-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                                Issues
+                                {{ $categoryConfig['issue_label'] ?? 'Issues' }}s
                                 @if($issues->where('status', '!=', \App\Enums\IssueStatus::Done)->count() > 0)
                                     <span class="ml-2 px-2 py-0.5 text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300 rounded-full">
                                         {{ $issues->where('status', '!=', \App\Enums\IssueStatus::Done)->count() }} open

@@ -21,6 +21,12 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="text-sm text-gray-600 dark:text-gray-400">{{ $project->type->label() }}</span>
+                    @if(($project->category ?? 'consultancy') !== 'consultancy')
+                        @php
+                            $catConfig = config('project-categories.' . $project->category);
+                        @endphp
+                        <span class="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 rounded">{{ $catConfig['label'] ?? $project->category }}</span>
+                    @endif
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     @php

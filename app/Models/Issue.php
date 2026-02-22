@@ -18,6 +18,10 @@ class Issue extends Model
         'urgency',
         'raw_email',
         'github_issue_number',
+        'meta',
+        'calendar_event_uri',
+        'scheduled_at',
+        'due_at',
     ];
 
     protected function casts(): array
@@ -25,6 +29,9 @@ class Issue extends Model
         return [
             'status' => IssueStatus::class,
             'urgency' => IssueUrgency::class,
+            'meta' => 'array',
+            'scheduled_at' => 'datetime',
+            'due_at' => 'datetime',
         ];
     }
 

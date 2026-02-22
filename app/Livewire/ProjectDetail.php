@@ -52,6 +52,9 @@ class ProjectDetail extends Component
     #[Validate('nullable|numeric|min:0')]
     public ?string $retainer_amount = null;
 
+    public string $category = 'consultancy';
+    public array $meta = [];
+
     #[Validate('required|string|min:1')]
     public string $newLogEntry = '';
 
@@ -82,6 +85,8 @@ class ProjectDetail extends Component
         $this->is_retainer = $project->is_retainer;
         $this->retainer_frequency = $project->retainer_frequency?->value;
         $this->retainer_amount = $project->retainer_amount;
+        $this->category = $project->category ?? 'consultancy';
+        $this->meta = $project->meta ?? [];
     }
 
     public function save(): void
@@ -111,6 +116,8 @@ class ProjectDetail extends Component
             'is_retainer' => $this->is_retainer,
             'retainer_frequency' => $this->retainer_frequency ?: null,
             'retainer_amount' => $this->retainer_amount ?: null,
+            'category' => $this->category,
+            'meta' => !empty($this->meta) ? $this->meta : null,
             'last_touched_at' => now(),
         ]);
 
@@ -367,6 +374,9 @@ class ProjectDetail extends Component
 
     public function render()
     {
+        $categoryConfig = config('project-categories.' . $this->category, config('project-categories.consultancy'));
+        $categories = config('project-categories');
+
         return view('livewire.project-detail', [
             'types' => ProjectType::cases(),
             'statuses' => ProjectStatus::cases(),
@@ -374,6 +384,8 @@ class ProjectDetail extends Component
             'retainerFrequencies' => RetainerFrequency::cases(),
             'issueStatuses' => IssueStatus::cases(),
             'issueUrgencies' => IssueUrgency::cases(),
+            'categoryConfig' => $categoryConfig,
+            'categories' => $categories,
             'logs' => $this->project->logs()->orderByDesc('created_at')->get(),
             'issues' => $this->project->issues()
                 ->with('tasks')

@@ -27,6 +27,9 @@ class Project extends Model
         'notes',
         'github_repo',
         'last_touched_at',
+        'category',
+        'meta',
+        'calendar_id',
     ];
 
     protected function casts(): array
@@ -43,7 +46,33 @@ class Project extends Model
             'retainer_frequency' => RetainerFrequency::class,
             'retainer_amount' => 'decimal:2',
             'priority' => 'integer',
+            'meta' => 'array',
         ];
+    }
+
+    public function categoryConfig(): array
+    {
+        return config('project-categories.' . ($this->category ?? 'consultancy'), config('project-categories.consultancy'));
+    }
+
+    public function getCategoryLabelAttribute(): string
+    {
+        return $this->categoryConfig()['label'] ?? 'Project';
+    }
+
+    public function getIssueLabelAttribute(): string
+    {
+        return $this->categoryConfig()['issue_label'] ?? 'Issue';
+    }
+
+    public function getTaskLabelAttribute(): string
+    {
+        return $this->categoryConfig()['task_label'] ?? 'Task';
+    }
+
+    public function shouldShowField(string $field): bool
+    {
+        return in_array($field, $this->categoryConfig()['show_fields'] ?? []);
     }
 
     public function logs(): HasMany
