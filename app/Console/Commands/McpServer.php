@@ -6,6 +6,7 @@ use App\Enums\MoneyStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProjectType;
 use App\Models\Issue;
+use App\Models\IssueTask;
 use App\Models\Project;
 use App\Services\EmailParser;
 use App\Services\GitHubService;
@@ -224,6 +225,11 @@ class McpServer extends Command
                         'type' => 'string',
                         'description' => 'Raw client email text. If provided without a title, AI will parse it to extract title, description, and urgency.',
                     ],
+                    'tasks' => [
+                        'type' => 'array',
+                        'description' => 'Array of task descriptions to create as sub-tasks on the issue',
+                        'items' => ['type' => 'string'],
+                    ],
                 ],
             ],
         ],
@@ -294,6 +300,19 @@ class McpServer extends Command
                     'project_name' => [
                         'type' => 'string',
                         'description' => 'Project name (fuzzy match)',
+                    ],
+                ],
+            ],
+        ],
+        [
+            'name' => 'list_tasks',
+            'description' => 'List all actionable work items across all active projects. Returns both standalone issues (issues with no sub-tasks) and child tasks from issues that have sub-tasks. Use this for a cross-project view of everything that needs doing.',
+            'inputSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'include_completed' => [
+                        'type' => 'boolean',
+                        'description' => 'Include completed items (default false)',
                     ],
                 ],
             ],
@@ -397,6 +416,7 @@ class McpServer extends Command
             'list_issues' => $this->toolListIssues($arguments),
             'update_issue' => $this->toolUpdateIssue($arguments),
             'sync_issues' => $this->toolSyncIssues($arguments),
+            'list_tasks' => $this->toolListTasks($arguments),
             default => ['error' => "Unknown tool: {$toolName}"],
         };
 
@@ -678,12 +698,14 @@ class McpServer extends Command
         $title = $args['title'] ?? null;
         $description = $args['description'] ?? null;
         $urgency = $args['urgency'] ?? 'medium';
+        $parsedTasks = [];
 
         if (!empty($args['raw_email']) && empty($title)) {
             $parsed = EmailParser::parse($args['raw_email']);
             $title = $parsed['title'];
             $description = $description ?? $parsed['description'];
             $urgency = $parsed['urgency'];
+            $parsedTasks = $parsed['tasks'] ?? [];
         }
 
         if (empty($title)) {
@@ -697,6 +719,18 @@ class McpServer extends Command
             'urgency' => $urgency,
             'raw_email' => $args['raw_email'] ?? null,
         ]);
+
+        // Create tasks if provided (explicit tasks take priority over parsed ones)
+        $tasks = !empty($args['tasks']) ? $args['tasks'] : $parsedTasks;
+        foreach ($tasks as $position => $taskDescription) {
+            if (!empty(trim($taskDescription))) {
+                $issue->tasks()->create([
+                    'description' => trim($taskDescription),
+                    'position' => $position + 1,
+                    'is_ai_generated' => empty($args['tasks']),
+                ]);
+            }
+        }
 
         // Push to GitHub if configured
         $githubNumber = null;
@@ -876,6 +910,70 @@ class McpServer extends Command
             'created' => $created,
             'updated' => $updated,
             'total_github_issues' => count($ghIssues),
+        ];
+    }
+
+    private function toolListTasks(array $args): array
+    {
+        $includeCompleted = !empty($args['include_completed']);
+
+        $activeProjectFilter = function ($q) {
+            $q->whereNotIn('status', ['complete', 'killed']);
+        };
+
+        // Child tasks from issues that have sub-tasks
+        $taskQuery = IssueTask::with(['issue.project'])
+            ->whereHas('issue.project', $activeProjectFilter);
+
+        if (!$includeCompleted) {
+            $taskQuery->where('is_complete', false);
+        }
+
+        $childTasks = $taskQuery->orderBy('created_at', 'desc')->get();
+
+        // Standalone issues (no child tasks)
+        $issueQuery = Issue::with('project')
+            ->doesntHave('tasks')
+            ->whereHas('project', $activeProjectFilter);
+
+        if (!$includeCompleted) {
+            $issueQuery->whereIn('status', ['open', 'in_progress']);
+        }
+
+        $standaloneIssues = $issueQuery->orderBy('created_at', 'desc')->get();
+
+        $items = [];
+
+        foreach ($childTasks as $task) {
+            $items[] = [
+                'type' => 'task',
+                'id' => $task->id,
+                'description' => $task->description,
+                'is_complete' => $task->is_complete,
+                'project' => $task->issue->project->name,
+                'project_id' => $task->issue->project->id,
+                'parent_issue' => $task->issue->title,
+                'parent_issue_id' => $task->issue->id,
+                'urgency' => $task->issue->urgency->value,
+            ];
+        }
+
+        foreach ($standaloneIssues as $issue) {
+            $items[] = [
+                'type' => 'issue',
+                'id' => $issue->id,
+                'description' => $issue->title,
+                'is_complete' => $issue->status->value === 'done',
+                'status' => $issue->status->value,
+                'project' => $issue->project->name,
+                'project_id' => $issue->project->id,
+                'urgency' => $issue->urgency->value,
+            ];
+        }
+
+        return [
+            'count' => count($items),
+            'items' => $items,
         ];
     }
 

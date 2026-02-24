@@ -7,6 +7,9 @@
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
+        <!-- Favicon -->
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M20 70 Q50-10 80 70' fill='none' stroke='%23cbd5e1' stroke-width='4' stroke-linecap='round'/><circle cx='20' cy='70' r='15' fill='%23f97316'/><circle cx='50' cy='18' r='15' fill='%236366f1'/><circle cx='80' cy='70' r='15' fill='%2310b981'/></svg>">
+
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />

@@ -224,6 +224,7 @@ const tools = [
                 description: { type: 'string', description: 'Issue description / action items' },
                 urgency: { type: 'string', description: 'Issue urgency', enum: ['low', 'medium', 'high'] },
                 raw_email: { type: 'string', description: 'Raw client email text. If provided without a title, AI will parse it.' },
+                tasks: { type: 'array', description: 'Array of task descriptions to create as sub-tasks on the issue', items: { type: 'string' } },
             },
         },
     },
@@ -262,6 +263,16 @@ const tools = [
             properties: {
                 project_id: { type: 'integer', description: 'Project ID' },
                 project_name: { type: 'string', description: 'Project name (fuzzy match)' },
+            },
+        },
+    },
+    {
+        name: 'list_tasks',
+        description: 'List all actionable work items across all active projects. Returns both standalone issues (issues with no sub-tasks) and child tasks from issues that have sub-tasks. Use this for a cross-project view of everything that needs doing.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                include_completed: { type: 'boolean', description: 'Include completed items (default false)' },
             },
         },
     },
@@ -430,6 +441,18 @@ async function handleToolCall(name, args) {
                 [project.id, title, description, 'open', urgency, args.raw_email || null]
             );
 
+            // Create tasks if provided
+            const tasks = args.tasks && args.tasks.length > 0 ? args.tasks : [];
+            for (let i = 0; i < tasks.length; i++) {
+                const taskDesc = (tasks[i] || '').trim();
+                if (taskDesc) {
+                    await conn.execute(
+                        'INSERT INTO issue_tasks (issue_id, description, is_complete, position, is_ai_generated, created_at, updated_at) VALUES (?, ?, 0, ?, 0, NOW(), NOW())',
+                        [result.insertId, taskDesc, i + 1]
+                    );
+                }
+            }
+
             // Push to GitHub if configured
             let githubNumber = null;
             if (project.github_repo && githubConfigured()) {
@@ -554,6 +577,74 @@ async function handleToolCall(name, args) {
             }
 
             return { success: true, message: `Synced issues for '${project.name}': ${created} created, ${updated} updated`, created, updated, total_github_issues: ghIssues.length };
+        }
+
+        case 'list_tasks': {
+            const includeCompleted = !!args.include_completed;
+
+            // Child tasks from issues that have sub-tasks, on active projects
+            let taskSql = `
+                SELECT it.id, it.description, it.is_complete, it.is_ai_generated,
+                       i.title as issue_title, i.id as issue_id, i.urgency,
+                       p.name as project_name, p.id as project_id
+                FROM issue_tasks it
+                JOIN issues i ON it.issue_id = i.id
+                JOIN projects p ON i.project_id = p.id
+                WHERE p.status NOT IN ('complete', 'killed')
+            `;
+            if (!includeCompleted) {
+                taskSql += ' AND it.is_complete = 0';
+            }
+            taskSql += ' ORDER BY it.created_at DESC';
+
+            const [childTasks] = await conn.execute(taskSql);
+
+            // Standalone issues (no child tasks) on active projects
+            let issueSql = `
+                SELECT i.id, i.title, i.status, i.urgency,
+                       p.name as project_name, p.id as project_id
+                FROM issues i
+                JOIN projects p ON i.project_id = p.id
+                WHERE p.status NOT IN ('complete', 'killed')
+                  AND NOT EXISTS (SELECT 1 FROM issue_tasks WHERE issue_id = i.id)
+            `;
+            if (!includeCompleted) {
+                issueSql += " AND i.status IN ('open', 'in_progress')";
+            }
+            issueSql += ' ORDER BY i.created_at DESC';
+
+            const [standaloneIssues] = await conn.execute(issueSql);
+
+            const items = [];
+
+            for (const t of childTasks) {
+                items.push({
+                    type: 'task',
+                    id: t.id,
+                    description: t.description,
+                    is_complete: !!t.is_complete,
+                    project: t.project_name,
+                    project_id: t.project_id,
+                    parent_issue: t.issue_title,
+                    parent_issue_id: t.issue_id,
+                    urgency: t.urgency,
+                });
+            }
+
+            for (const i of standaloneIssues) {
+                items.push({
+                    type: 'issue',
+                    id: i.id,
+                    description: i.title,
+                    is_complete: i.status === 'done',
+                    status: i.status,
+                    project: i.project_name,
+                    project_id: i.project_id,
+                    urgency: i.urgency,
+                });
+            }
+
+            return { count: items.length, items };
         }
 
         default:

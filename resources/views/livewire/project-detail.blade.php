@@ -166,7 +166,7 @@
                                     wire:click="$toggle('showIssueForm')"
                                     class="px-3 py-1.5 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-500"
                                 >
-                                    {{ $showIssueForm ? 'Cancel' : 'Add Issue from Email' }}
+                                    {{ $showIssueForm ? 'Cancel' : 'Add Issue' }}
                                 </button>
                             </div>
                         </div>
@@ -179,25 +179,6 @@
 
                         @if($showIssueForm)
                             <div class="mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-3">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Paste client email</label>
-                                    <textarea
-                                        wire:model.live="newIssueEmail"
-                                        rows="5"
-                                        class="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                        placeholder="Paste the client's email here..."
-                                    ></textarea>
-                                    <button
-                                        wire:click="parseEmail"
-                                        wire:loading.attr="disabled"
-                                        wire:target="parseEmail"
-                                        class="mt-2 px-3 py-1.5 text-sm font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 rounded-md hover:bg-indigo-200 dark:hover:bg-indigo-900 disabled:opacity-50"
-                                    >
-                                        <span wire:loading.remove wire:target="parseEmail">Parse with AI</span>
-                                        <span wire:loading wire:target="parseEmail">Parsing...</span>
-                                    </button>
-                                </div>
-
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title *</label>
                                     <input
@@ -213,9 +194,9 @@
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
                                     <textarea
                                         wire:model.live="newIssueDescription"
-                                        rows="12"
+                                        rows="4"
                                         class="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                        placeholder="Action items..."
+                                        placeholder="Description or action items..."
                                     ></textarea>
                                 </div>
 
@@ -230,6 +211,30 @@
                                         @endforeach
                                     </select>
                                 </div>
+
+                                <!-- Optional: Parse from email -->
+                                <details class="border border-gray-200 dark:border-gray-600 rounded-md">
+                                    <summary class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
+                                        Parse from client email
+                                    </summary>
+                                    <div class="px-3 pb-3 pt-1">
+                                        <textarea
+                                            wire:model.live="newIssueEmail"
+                                            rows="5"
+                                            class="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                            placeholder="Paste the client's email here..."
+                                        ></textarea>
+                                        <button
+                                            wire:click="parseEmail"
+                                            wire:loading.attr="disabled"
+                                            wire:target="parseEmail"
+                                            class="mt-2 px-3 py-1.5 text-sm font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 rounded-md hover:bg-indigo-200 dark:hover:bg-indigo-900 disabled:opacity-50"
+                                        >
+                                            <span wire:loading.remove wire:target="parseEmail">Parse with AI</span>
+                                            <span wire:loading wire:target="parseEmail">Parsing...</span>
+                                        </button>
+                                    </div>
+                                </details>
 
                                 @if(count($newIssueTasks) > 0)
                                     <div>

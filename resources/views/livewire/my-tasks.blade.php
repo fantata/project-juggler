@@ -65,23 +65,23 @@
         </div>
 
         <!-- Tasks by Project -->
-        @forelse($tasksByProject as $projectName => $tasks)
+        @forelse($tasksByProject as $projectName => $items)
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-4">
                 <div class="p-4">
                     <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
                         <span>{{ $projectName }}</span>
                         <span class="text-xs font-normal px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded-full">
-                            {{ $tasks->where('is_complete', false)->count() }} remaining
+                            {{ $items->where('is_complete', false)->count() }} remaining
                         </span>
                     </h3>
                     <div class="space-y-1">
-                        @foreach($tasks as $task)
-                            <div class="flex items-center gap-3 group {{ $task->is_complete ? 'opacity-50' : '' }}">
+                        @foreach($items as $item)
+                            <div class="flex items-center gap-3 group {{ $item->is_complete ? 'opacity-50' : '' }}">
                                 <button
-                                    wire:click="toggleTask({{ $task->id }})"
+                                    wire:click="{{ $item->type === 'issue' ? 'toggleIssue' : 'toggleTask' }}({{ $item->id }})"
                                     class="flex items-center gap-3 flex-1 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded px-2 py-1.5 -mx-2"
                                 >
-                                    @if($task->is_complete)
+                                    @if($item->is_complete)
                                         <svg class="w-5 h-5 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
                                         </svg>
@@ -91,22 +91,31 @@
                                         </svg>
                                     @endif
                                     <div class="flex-1 min-w-0">
-                                        <span class="text-sm text-gray-800 dark:text-gray-200 {{ $task->is_complete ? 'line-through text-gray-400 dark:text-gray-500' : '' }}">
-                                            {{ $task->description }}
+                                        <span class="text-sm text-gray-800 dark:text-gray-200 {{ $item->is_complete ? 'line-through text-gray-400 dark:text-gray-500' : '' }}">
+                                            {{ $item->description }}
                                         </span>
                                         <div class="flex items-center gap-2 mt-0.5">
-                                            <a href="{{ route('projects.show', $task->issue->project) }}" wire:navigate class="text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-400">
-                                                {{ $task->issue->title }}
-                                            </a>
-                                            @if($task->is_ai_generated)
+                                            @if($item->type === 'task' && $item->parent_title)
+                                                <a href="{{ route('projects.show', $item->project_id) }}" wire:navigate class="text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-400">
+                                                    {{ $item->parent_title }}
+                                                </a>
+                                            @endif
+                                            @if($item->type === 'issue')
+                                                @if($item->urgency === 'high')
+                                                    <span class="text-xs text-red-500 dark:text-red-400 font-medium">High</span>
+                                                @elseif($item->urgency === 'low')
+                                                    <span class="text-xs text-gray-400 dark:text-gray-500">Low</span>
+                                                @endif
+                                            @endif
+                                            @if($item->is_ai_generated)
                                                 <span class="text-xs text-indigo-400 dark:text-indigo-500">AI</span>
                                             @endif
                                         </div>
                                     </div>
                                 </button>
                                 <button
-                                    wire:click="deleteTask({{ $task->id }})"
-                                    wire:confirm="Delete this task?"
+                                    wire:click="{{ $item->type === 'issue' ? 'deleteIssue' : 'deleteTask' }}({{ $item->id }})"
+                                    wire:confirm="Delete this {{ $item->type === 'issue' ? 'issue' : 'task' }}?"
                                     class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-1 shrink-0"
                                 >
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -140,11 +149,11 @@
 
         <!-- Hidden element for copy -->
         <div id="tasks-for-copy" class="sr-only" aria-hidden="true">Here are my current tasks:
-@foreach($tasksByProject as $projectName => $tasks)
+@foreach($tasksByProject as $projectName => $items)
 
 ## {{ $projectName }}
-@foreach($tasks->where('is_complete', false) as $task)
-- [ ] {{ $task->description }} ({{ $task->issue->title }})
+@foreach($items->where('is_complete', false) as $item)
+- [ ] {{ $item->description }}{{ $item->parent_title ? ' (' . $item->parent_title . ')' : '' }}
 @endforeach
 @endforeach
         </div>
