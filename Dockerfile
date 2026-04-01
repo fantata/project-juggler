@@ -16,11 +16,15 @@ RUN apk add --no-cache \
     unzip \
     oniguruma-dev \
     icu-dev \
-    netcat-openbsd
+    netcat-openbsd \
+    imap-dev \
+    krb5-dev \
+    openssl-dev
 
 # Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd zip intl
+    && docker-php-ext-configure imap --with-kerberos --with-imap-ssl \
+    && docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd zip intl imap
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
