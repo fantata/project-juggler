@@ -310,27 +310,34 @@ class SendDailyBrief extends Command
         // Hit both FreeAgent accounts (Fantata + Dogface) for unpaid invoices
         $lines = ["## Finances\n"];
 
+        // Tokens can be supplied two ways:
+        // 1. FREEAGENT_FANTATA_ACCESS_TOKEN / FREEAGENT_DOGFACE_ACCESS_TOKEN env vars (preferred on prod)
+        // 2. Token files (local dev) — reads accessToken key (camelCase, matching freeagent-mcp format)
         $accounts = [
             'fantata' => [
-                'token_file' => env('FREEAGENT_FANTATA_TOKEN_FILE', '/app/freeagent-tokens-fantata.json'),
+                'token_env'  => 'FREEAGENT_FANTATA_ACCESS_TOKEN',
+                'token_file' => env('FREEAGENT_FANTATA_TOKEN_FILE', '/Users/chris/Code/Projects/freeagent-mcp/.tokens-a.json'),
             ],
             'dogface' => [
-                'token_file' => env('FREEAGENT_DOGFACE_TOKEN_FILE', '/app/freeagent-tokens-dogface.json'),
+                'token_env'  => 'FREEAGENT_DOGFACE_ACCESS_TOKEN',
+                'token_file' => env('FREEAGENT_DOGFACE_TOKEN_FILE', '/Users/chris/Code/Projects/freeagent-mcp/.tokens-b.json'),
             ],
         ];
 
         foreach ($accounts as $name => $config) {
-            $tokenFile = $config['token_file'];
-            if (! file_exists($tokenFile)) {
-                $lines[] = "**{$name}:** token file not found at {$tokenFile} — skipping";
-                continue;
+            // Prefer explicit env var, fall back to token file
+            $accessToken = env($config['token_env']);
+            if (! $accessToken) {
+                $tokenFile = $config['token_file'];
+                if (file_exists($tokenFile)) {
+                    $tokens      = json_decode(file_get_contents($tokenFile), true);
+                    $accessToken = $tokens['accessToken'] ?? $tokens['access_token'] ?? null;
+                }
             }
 
             try {
-                $tokens      = json_decode(file_get_contents($tokenFile), true);
-                $accessToken = $tokens['access_token'] ?? null;
                 if (! $accessToken) {
-                    $lines[] = "**{$name}:** no access_token in token file";
+                    $lines[] = "**{$name}:** no token configured — skipping";
                     continue;
                 }
 
