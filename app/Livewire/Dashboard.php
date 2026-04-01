@@ -18,6 +18,9 @@ class Dashboard extends Component
     public string $filterMoneyStatus = '';
 
     #[Url]
+    public string $viewMode = 'tiles';
+
+    #[Url]
     public bool $showCompleted = false;
 
     public bool $showQuickAdd = false;

@@ -276,6 +276,102 @@ const tools = [
             },
         },
     },
+    {
+        name: 'update_project_context',
+        description: `Store AI-generated context for a project. Claude Code instances should call this at the END of a working session to persist state for future sessions.
+
+Accepts markdown or JSON string. Recommended JSON structure:
+{
+  "summary": "One-sentence current state of the project",
+  "stack": ["key", "technologies", "in use"],
+  "key_files": ["list of important file paths with brief note"],
+  "decisions": ["Architectural or design decisions made, with rationale"],
+  "current_focus": "What is actively being worked on right now",
+  "blockers": ["Anything blocking progress"],
+  "next_steps": ["Ordered list of what to do next"],
+  "open_questions": ["Unresolved questions or unknowns"],
+  "notes": "Any other freeform context useful for a future Claude session"
+}
+
+Overwrites previous context. Max ~100KB. The stored context is returned by get_project and get_project_context.`,
+        inputSchema: {
+            type: 'object',
+            properties: {
+                id: { type: 'integer', description: 'Project ID' },
+                name: { type: 'string', description: 'Project name (fuzzy match)' },
+                context: { type: 'string', description: 'Context blob — markdown or JSON string' },
+            },
+            required: ['context'],
+        },
+    },
+    {
+        name: 'get_project_context',
+        description: 'Retrieve the stored AI context for a project. Claude Code instances should call this at the START of a session to load prior state. Returns the raw context string (markdown or JSON) previously saved by update_project_context.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                id: { type: 'integer', description: 'Project ID' },
+                name: { type: 'string', description: 'Project name (fuzzy match)' },
+            },
+        },
+    },
+    {
+        name: 'add_daily_note',
+        description: 'Add a personal daily note — use for mood, energy, context about a gap in work, or anything not project-specific. Call this when returning after time away, or to capture current state/energy.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                body: { type: 'string', description: 'The note content' },
+                energy_level: { type: 'string', description: 'Current energy level', enum: ['low', 'medium', 'high'] },
+            },
+            required: ['body'],
+        },
+    },
+    {
+        name: 'get_daily_notes',
+        description: 'Get recent personal daily notes. Use at the start of a session to understand context from recent days — especially after a gap.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                days: { type: 'integer', description: 'How many days back to fetch (default 14)' },
+            },
+        },
+    },
+    {
+        name: 'get_today',
+        description: 'Get today\'s date, calendar events, and a quick task count. Use at the start of every session to orient.',
+        inputSchema: {
+            type: 'object',
+            properties: {},
+        },
+    },
+    {
+        name: 'list_calendar_events',
+        description: 'List calendar events (native + external feeds) in a date range.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                from: { type: 'string', description: 'Start date YYYY-MM-DD (default: today)' },
+                to: { type: 'string', description: 'End date YYYY-MM-DD (default: 7 days from today)' },
+            },
+        },
+    },
+    {
+        name: 'create_calendar_event',
+        description: 'Create a calendar event.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                title: { type: 'string', description: 'Event title' },
+                starts_at: { type: 'string', description: 'ISO datetime e.g. 2026-04-02T10:00:00' },
+                ends_at: { type: 'string', description: 'ISO datetime (optional)' },
+                is_all_day: { type: 'boolean', description: 'All-day event (default false)' },
+                location: { type: 'string', description: 'Location (optional)' },
+                description: { type: 'string', description: 'Description (optional)' },
+            },
+            required: ['title', 'starts_at'],
+        },
+    },
 ];
 
 async function findProject(args) {
@@ -343,6 +439,8 @@ async function handleToolCall(name, args) {
                 ...project,
                 deadline: project.deadline ? project.deadline.toISOString().split('T')[0] : null,
                 github_repo: project.github_repo,
+                ai_context: project.ai_context || null,
+                ai_context_updated_at: project.ai_context_updated_at || null,
                 open_issue_count,
                 recent_logs: logs.map(l => ({ entry: l.entry, created_at: l.created_at })),
                 open_issues: issues.map(i => ({ id: i.id, title: i.title, status: i.status, urgency: i.urgency, github_issue_number: i.github_issue_number, created_at: i.created_at })),
@@ -645,6 +743,128 @@ async function handleToolCall(name, args) {
             }
 
             return { count: items.length, items };
+        }
+
+        case 'update_project_context': {
+            const project = await findProject({ id: args.id, name: args.name });
+            if (!project) return { error: 'Project not found' };
+            if (!args.context) return { error: 'context is required' };
+            await conn.execute(
+                'UPDATE projects SET ai_context = ?, ai_context_updated_at = NOW(), last_touched_at = NOW(), updated_at = NOW() WHERE id = ?',
+                [args.context, project.id]
+            );
+            return { success: true, message: `AI context saved for '${project.name}'`, project_id: project.id, bytes: Buffer.byteLength(args.context, 'utf8') };
+        }
+
+        case 'get_project_context': {
+            const project = await findProject({ id: args.id, name: args.name });
+            if (!project) return { error: 'Project not found' };
+            if (!project.ai_context) return { project: project.name, project_id: project.id, context: null, message: 'No AI context stored yet' };
+            return {
+                project: project.name,
+                project_id: project.id,
+                context: project.ai_context,
+                updated_at: project.ai_context_updated_at,
+            };
+        }
+
+        case 'add_daily_note': {
+            if (!args.body) return { error: 'body is required' };
+            const validEnergy = ['low', 'medium', 'high'];
+            const energy = validEnergy.includes(args.energy_level) ? args.energy_level : null;
+            const [result] = await conn.execute(
+                'INSERT INTO daily_notes (body, energy_level, created_at, updated_at) VALUES (?, ?, NOW(), NOW())',
+                [args.body, energy]
+            );
+            return { success: true, message: 'Daily note saved', id: result.insertId };
+        }
+
+        case 'get_daily_notes': {
+            const days = Math.min(365, Math.max(1, parseInt(args.days) || 14));
+            const [notes] = await conn.execute(
+                'SELECT id, body, energy_level, created_at FROM daily_notes WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY) ORDER BY created_at DESC',
+                [days]
+            );
+            return { count: notes.length, days, notes };
+        }
+
+        case 'get_today': {
+            const today = new Date();
+            const dateStr = today.toISOString().split('T')[0];
+
+            const [nativeEvents] = await conn.execute(
+                `SELECT title, starts_at, ends_at, is_all_day, location, 'native' as source
+                 FROM calendar_events
+                 WHERE DATE(starts_at) = ? OR (is_all_day = 1 AND DATE(starts_at) <= ? AND (ends_at IS NULL OR DATE(ends_at) >= ?))
+                 ORDER BY is_all_day DESC, starts_at ASC`,
+                [dateStr, dateStr, dateStr]
+            );
+
+            const [feedEvents] = await conn.execute(
+                `SELECT ife.title, ife.starts_at, ife.ends_at, ife.is_all_day, ife.location, f.name as feed_name, 'feed' as source
+                 FROM ics_feed_events ife
+                 JOIN ics_feeds f ON ife.ics_feed_id = f.id
+                 WHERE ife.is_backgrounded = 0
+                   AND (DATE(ife.starts_at) = ? OR (ife.is_all_day = 1 AND DATE(ife.starts_at) <= ? AND (ife.ends_at IS NULL OR DATE(ife.ends_at) >= ?)))
+                 ORDER BY ife.is_all_day DESC, ife.starts_at ASC`,
+                [dateStr, dateStr, dateStr]
+            );
+
+            const [[{ open_tasks }]] = await conn.execute(
+                `SELECT COUNT(*) as open_tasks FROM issue_tasks it
+                 JOIN issues i ON it.issue_id = i.id
+                 JOIN projects p ON i.project_id = p.id
+                 WHERE it.is_complete = 0 AND p.status NOT IN ('complete', 'killed')`
+            );
+
+            const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+            const allEvents = [...nativeEvents, ...feedEvents].sort((a, b) => {
+                if (a.is_all_day && !b.is_all_day) return -1;
+                if (!a.is_all_day && b.is_all_day) return 1;
+                return new Date(a.starts_at) - new Date(b.starts_at);
+            });
+            return {
+                date: dateStr,
+                day: dayNames[today.getDay()],
+                events: allEvents,
+                open_tasks,
+            };
+        }
+
+        case 'list_calendar_events': {
+            const from = args.from || new Date().toISOString().split('T')[0];
+            const to = args.to || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+
+            const [nativeEvents] = await conn.execute(
+                `SELECT title, starts_at, ends_at, is_all_day, location, description, 'native' as source
+                 FROM calendar_events WHERE DATE(starts_at) >= ? AND DATE(starts_at) <= ? ORDER BY starts_at ASC`,
+                [from, to]
+            );
+
+            const [feedEvents] = await conn.execute(
+                `SELECT ife.title, ife.starts_at, ife.ends_at, ife.is_all_day, ife.location, ife.description,
+                        f.name as feed_name, 'feed' as source
+                 FROM ics_feed_events ife
+                 JOIN ics_feeds f ON ife.ics_feed_id = f.id
+                 WHERE ife.is_backgrounded = 0 AND DATE(ife.starts_at) >= ? AND DATE(ife.starts_at) <= ?
+                 ORDER BY ife.starts_at ASC`,
+                [from, to]
+            );
+
+            const all = [...nativeEvents, ...feedEvents].sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+            return { from, to, count: all.length, events: all };
+        }
+
+        case 'create_calendar_event': {
+            if (!args.title) return { error: 'title is required' };
+            if (!args.starts_at) return { error: 'starts_at is required' };
+            const uid = `mcp-${Date.now()}-${Math.random().toString(36).slice(2)}@juggler`;
+            const [result] = await conn.execute(
+                `INSERT INTO calendar_events (title, starts_at, ends_at, is_all_day, location, description, uid, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+                [args.title, args.starts_at, args.ends_at || null, args.is_all_day ? 1 : 0, args.location || null, args.description || null, uid]
+            );
+            return { success: true, message: `Event '${args.title}' created`, id: result.insertId };
         }
 
         default:

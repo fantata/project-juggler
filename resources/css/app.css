@@ -1,3 +1,97 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* FullCalendar warm theme overrides */
+.fc-warm {
+    --fc-border-color: #F0E8D4;
+    --fc-today-bg-color: #FFF8F0;
+    --fc-neutral-bg-color: #FFFDF9;
+    --fc-page-bg-color: transparent;
+    --fc-event-border-color: transparent;
+}
+
+.dark .fc-warm {
+    --fc-border-color: #374151;
+    --fc-today-bg-color: #1f2937;
+    --fc-neutral-bg-color: #111827;
+    --fc-page-bg-color: transparent;
+}
+
+.fc-warm .fc-toolbar-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #42310A;
+}
+
+.dark .fc-warm .fc-toolbar-title {
+    color: #FFF8F0;
+}
+
+.fc-warm .fc-button {
+    background-color: #F0E8D4;
+    border-color: #E0D0A9;
+    color: #5A430E;
+    font-weight: 500;
+    font-size: 0.8125rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.5rem;
+    text-transform: capitalize;
+}
+
+.fc-warm .fc-button:hover {
+    background-color: #E0D0A9;
+    border-color: #C4AD74;
+    color: #42310A;
+}
+
+.fc-warm .fc-button-active,
+.fc-warm .fc-button.fc-button-active {
+    background-color: #C2714F !important;
+    border-color: #A85A3B !important;
+    color: white !important;
+}
+
+.dark .fc-warm .fc-button {
+    background-color: #374151;
+    border-color: #4B5563;
+    color: #D1D5DB;
+}
+
+.dark .fc-warm .fc-button:hover {
+    background-color: #4B5563;
+    color: #F9FAFB;
+}
+
+.fc-warm .fc-event {
+    border-radius: 0.375rem;
+    padding: 1px 4px;
+    font-size: 0.8125rem;
+}
+
+.fc-warm .fc-daygrid-day-number {
+    color: #725612;
+    font-weight: 500;
+    padding: 0.25rem 0.5rem;
+}
+
+.dark .fc-warm .fc-daygrid-day-number {
+    color: #C4AD74;
+}
+
+.fc-warm .fc-col-header-cell-cushion {
+    color: #8B6914;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.dark .fc-warm .fc-col-header-cell-cushion {
+    color: #A68B4B;
+}
+
+/* Safe area for iOS bottom bar */
+.safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+}

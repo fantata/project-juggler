@@ -7,6 +7,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
@@ -35,6 +36,26 @@ class ProfileController extends Controller
         $request->user()->save();
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
+    }
+
+    public function generateToken(Request $request): RedirectResponse
+    {
+        $type = $request->input('type', 'api');
+        $plainToken = Str::random(64);
+
+        if ($type === 'ics') {
+            $request->user()->update([
+                'ics_feed_token' => hash('sha256', $plainToken),
+            ]);
+
+            return Redirect::route('profile.edit')->with('ics_token', $plainToken);
+        }
+
+        $request->user()->update([
+            'api_token' => hash('sha256', $plainToken),
+        ]);
+
+        return Redirect::route('profile.edit')->with('api_token', $plainToken);
     }
 
     /**
