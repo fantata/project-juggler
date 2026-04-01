@@ -117,6 +117,53 @@ async function githubListIssues(repo, state = 'all') {
     return allIssues;
 }
 
+// Fetch recent push events for the fantata org / user
+// GitHub Events API only goes back ~90 days and returns max 300 events across 10 pages
+async function githubGetRecentCommits(org, days, repoFilter) {
+    const cutoff = new Date(Date.now() - days * 86400000);
+    const commitsByRepo = {};
+    let page = 1;
+    let done = false;
+
+    while (!done && page <= 10) {
+        let events;
+        try {
+            events = await githubApi('GET', `/orgs/${org}/events?per_page=100&page=${page}`);
+        } catch (e) {
+            break;
+        }
+        if (!Array.isArray(events) || events.length === 0) break;
+
+        for (const event of events) {
+            if (event.type !== 'PushEvent') continue;
+            const eventDate = new Date(event.created_at);
+            if (eventDate < cutoff) { done = true; break; }
+
+            const repoName = event.repo?.name?.replace(`${org}/`, '') || event.repo?.name;
+            if (repoFilter && repoName !== repoFilter) continue;
+            const fullRepo = event.repo?.name;
+
+            if (!commitsByRepo[repoName]) {
+                commitsByRepo[repoName] = { repo: repoName, full_repo: fullRepo, commits: [] };
+            }
+
+            const commits = event.payload?.commits || [];
+            for (const commit of commits) {
+                // Skip merge commits
+                if (commit.message?.startsWith('Merge ')) continue;
+                commitsByRepo[repoName].commits.push({
+                    sha: commit.sha?.substring(0, 7),
+                    message: commit.message?.split('\n')[0], // first line only
+                    date: event.created_at,
+                    branch: event.payload?.ref?.replace('refs/heads/', ''),
+                });
+            }
+        }
+        page++;
+    }
+    return commitsByRepo;
+}
+
 function fallbackParse(rawEmail) {
     const lines = rawEmail.trim().split('\n');
     return {
@@ -372,6 +419,17 @@ Overwrites previous context. Max ~100KB. The stored context is returned by get_p
             required: ['title', 'starts_at'],
         },
     },
+    {
+        name: 'get_github_activity',
+        description: 'Get recent GitHub commit activity across all repos, grouped by repository and mapped to projects where possible. Use this to see where time has actually been spent, or to catch up after a gap.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                days: { type: 'integer', description: 'How many days back to look (default 14, max 30)' },
+                repo: { type: 'string', description: 'Filter to a specific repo slug e.g. "site-audit-master" (optional)' },
+            },
+        },
+    },
 ];
 
 async function findProject(args) {
@@ -435,6 +493,26 @@ async function handleToolCall(name, args) {
                 "SELECT id, title, status, urgency, github_issue_number, created_at FROM issues WHERE project_id = ? AND status IN ('open', 'in_progress') ORDER BY created_at DESC LIMIT 10",
                 [project.id]
             );
+
+            // Fetch recent commits if repo is linked and GitHub is configured
+            let recent_commits = null;
+            if (project.github_repo && githubConfigured()) {
+                try {
+                    const commitsResp = await githubApi('GET', `/repos/${project.github_repo}/commits?per_page=10`);
+                    if (Array.isArray(commitsResp)) {
+                        recent_commits = commitsResp
+                            .filter(c => !c.commit?.message?.startsWith('Merge '))
+                            .slice(0, 10)
+                            .map(c => ({
+                                sha: c.sha?.substring(0, 7),
+                                message: c.commit?.message?.split('\n')[0],
+                                date: c.commit?.author?.date,
+                                author: c.commit?.author?.name,
+                            }));
+                    }
+                } catch (e) { /* GitHub unavailable — don't fail the whole call */ }
+            }
+
             return {
                 ...project,
                 deadline: project.deadline ? project.deadline.toISOString().split('T')[0] : null,
@@ -444,6 +522,7 @@ async function handleToolCall(name, args) {
                 open_issue_count,
                 recent_logs: logs.map(l => ({ entry: l.entry, created_at: l.created_at })),
                 open_issues: issues.map(i => ({ id: i.id, title: i.title, status: i.status, urgency: i.urgency, github_issue_number: i.github_issue_number, created_at: i.created_at })),
+                recent_commits,
             };
         }
 
@@ -865,6 +944,56 @@ async function handleToolCall(name, args) {
                 [args.title, args.starts_at, args.ends_at || null, args.is_all_day ? 1 : 0, args.location || null, args.description || null, uid]
             );
             return { success: true, message: `Event '${args.title}' created`, id: result.insertId };
+        }
+
+        case 'get_github_activity': {
+            if (!githubConfigured()) return { error: 'GITHUB_TOKEN not configured' };
+
+            const days = Math.min(30, Math.max(1, parseInt(args.days) || 14));
+            const repoFilter = args.repo || null;
+            const org = 'fantata';
+
+            let commitsByRepo;
+            try {
+                commitsByRepo = await githubGetRecentCommits(org, days, repoFilter);
+            } catch (e) {
+                return { error: 'Failed to fetch GitHub activity: ' + e.message };
+            }
+
+            // Load all projects with github_repo set to map repo → project name
+            const [projects] = await conn.execute(
+                "SELECT name, github_repo FROM projects WHERE github_repo IS NOT NULL"
+            );
+            const repoToProject = {};
+            for (const p of projects) {
+                const slug = p.github_repo.replace(`${org}/`, '').replace(/.*\//, '');
+                repoToProject[slug] = p.name;
+                repoToProject[p.github_repo] = p.name; // also match full form
+            }
+
+            // Build summary
+            const summary = Object.values(commitsByRepo)
+                .sort((a, b) => b.commits.length - a.commits.length)
+                .map(r => ({
+                    repo: r.repo,
+                    project: repoToProject[r.repo] || repoToProject[r.full_repo] || null,
+                    commit_count: r.commits.length,
+                    commits: r.commits.slice(0, 10), // cap at 10 per repo
+                    last_commit: r.commits[0]?.date || null,
+                }));
+
+            const totalCommits = summary.reduce((n, r) => n + r.commit_count, 0);
+
+            return {
+                days,
+                org,
+                total_commits: totalCommits,
+                repos_touched: summary.length,
+                activity: summary,
+                note: summary.length === 0
+                    ? 'No push activity found. Make sure GITHUB_TOKEN has read:org and repo scopes.'
+                    : null,
+            };
         }
 
         default:
