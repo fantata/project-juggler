@@ -16,7 +16,7 @@
             @endphp
 
             <a
-                href="{{ route('projects.show', $project) }}"
+                href="{{ route('projects.detail', $project) }}"
                 wire:navigate
                 class="group relative bg-white dark:bg-gray-800 rounded-xl border border-cream-200 dark:border-gray-700 p-5 hover:shadow-md hover:border-{{ $accent }}-300 dark:hover:border-{{ $accent }}-600 transition-all duration-200 {{ $isOverdue ? 'border-l-4 border-l-red-400' : ($isUrgent ? 'border-l-4 border-l-amber-400' : ($isPriority ? 'border-l-4 border-l-terracotta-400' : '')) }}"
             >

@@ -125,10 +125,9 @@ async function githubListIssues(repo, state = 'all') {
     return allIssues;
 }
 
-// Fetch recent push events for the fantata org / user
+// Fetch recent push events from a GitHub Events API endpoint
 // GitHub Events API only goes back ~90 days and returns max 300 events across 10 pages
-async function githubGetRecentCommits(org, days, repoFilter) {
-    const cutoff = new Date(Date.now() - days * 86400000);
+async function fetchPushEvents(endpoint, cutoff, repoFilter, orgPrefix) {
     const commitsByRepo = {};
     let page = 1;
     let done = false;
@@ -136,7 +135,7 @@ async function githubGetRecentCommits(org, days, repoFilter) {
     while (!done && page <= 10) {
         let events;
         try {
-            events = await githubApi('GET', `/orgs/${org}/events?per_page=100&page=${page}`);
+            events = await githubApi('GET', `${endpoint}?per_page=100&page=${page}`);
         } catch (e) {
             break;
         }
@@ -147,7 +146,7 @@ async function githubGetRecentCommits(org, days, repoFilter) {
             const eventDate = new Date(event.created_at);
             if (eventDate < cutoff) { done = true; break; }
 
-            const repoName = event.repo?.name?.replace(`${org}/`, '') || event.repo?.name;
+            const repoName = event.repo?.name?.replace(`${orgPrefix}/`, '') || event.repo?.name;
             if (repoFilter && repoName !== repoFilter) continue;
             const fullRepo = event.repo?.name;
 
@@ -157,11 +156,10 @@ async function githubGetRecentCommits(org, days, repoFilter) {
 
             const commits = event.payload?.commits || [];
             for (const commit of commits) {
-                // Skip merge commits
                 if (commit.message?.startsWith('Merge ')) continue;
                 commitsByRepo[repoName].commits.push({
                     sha: commit.sha?.substring(0, 7),
-                    message: commit.message?.split('\n')[0], // first line only
+                    message: commit.message?.split('\n')[0],
                     date: event.created_at,
                     branch: event.payload?.ref?.replace('refs/heads/', ''),
                 });
@@ -169,6 +167,20 @@ async function githubGetRecentCommits(org, days, repoFilter) {
         }
         page++;
     }
+    return commitsByRepo;
+}
+
+// Try org events first, fall back to user events if empty or errored
+async function githubGetRecentCommits(org, days, repoFilter) {
+    const cutoff = new Date(Date.now() - days * 86400000);
+
+    let commitsByRepo = await fetchPushEvents(`/orgs/${org}/events`, cutoff, repoFilter, org);
+
+    // Fall back to user events if org endpoint returned nothing
+    if (Object.keys(commitsByRepo).length === 0) {
+        commitsByRepo = await fetchPushEvents(`/users/${org}/events`, cutoff, repoFilter, org);
+    }
+
     return commitsByRepo;
 }
 
@@ -184,7 +196,7 @@ function fallbackParse(rawEmail) {
 const tools = [
     {
         name: 'list_projects',
-        description: 'List all projects with optional filters',
+        description: 'List all projects with optional filters. By default returns active, paused, and blocked projects (not complete/killed). Use the status filter to see other statuses.',
         inputSchema: {
             type: 'object',
             properties: {
@@ -208,12 +220,12 @@ const tools = [
     },
     {
         name: 'create_project',
-        description: 'Create a new project',
+        description: 'Create a new project. Both name and type are required.',
         inputSchema: {
             type: 'object',
             properties: {
-                name: { type: 'string', description: 'Project name' },
-                type: { type: 'string', description: 'Project type', enum: ['client', 'personal', 'speculative'] },
+                name: { type: 'string', description: 'Project name (required)' },
+                type: { type: 'string', description: 'Project type (required)', enum: ['client', 'personal', 'speculative'] },
                 status: { type: 'string', description: 'Project status', enum: ['active', 'paused', 'blocked', 'complete', 'killed'] },
                 waiting_on_client: { type: 'boolean', description: 'Waiting on client response' },
                 priority: { type: 'integer', description: 'Priority (lower = higher priority)' },
@@ -251,13 +263,14 @@ const tools = [
     },
     {
         name: 'log_work',
-        description: 'Add a log entry to a project',
+        description: 'Add a log entry to a project. Provide project_id or project_name for lookup. Hours is optional.',
         inputSchema: {
             type: 'object',
             properties: {
                 project_id: { type: 'integer', description: 'Project ID' },
                 project_name: { type: 'string', description: 'Project name (fuzzy match)' },
                 entry: { type: 'string', description: 'Log entry text' },
+                hours: { type: 'number', description: 'Hours spent (optional)' },
             },
             required: ['entry'],
         },
@@ -429,7 +442,7 @@ Overwrites previous context. Max ~100KB. The stored context is returned by get_p
     },
     {
         name: 'get_github_activity',
-        description: 'Get recent GitHub commit activity across all repos, grouped by repository and mapped to projects where possible. Use this to see where time has actually been spent, or to catch up after a gap.',
+        description: 'Get recent GitHub commit activity across all repos, grouped by repository and mapped to projects where possible. Use this to see where time has actually been spent, or to catch up after a gap. Requires GITHUB_TOKEN env var with read:org and repo scopes.',
         inputSchema: {
             type: 'object',
             properties: {
@@ -578,11 +591,11 @@ async function handleToolCall(name, args) {
             const project = await findProject({ id: args.project_id, name: args.project_name });
             if (!project) return { error: 'Project not found' };
             await conn.execute(
-                'INSERT INTO project_logs (project_id, entry, created_at, updated_at) VALUES (?, ?, NOW(), NOW())',
-                [project.id, args.entry]
+                'INSERT INTO project_logs (project_id, entry, hours, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())',
+                [project.id, args.entry, args.hours || null]
             );
             await touchProject(conn, project.id);
-            return { success: true, message: `Logged work on '${project.name}'`, project_id: project.id };
+            return { success: true, message: `Logged work on '${project.name}'${args.hours ? ` (${args.hours}h)` : ''}`, project_id: project.id };
         }
 
         case 'quick_status': {

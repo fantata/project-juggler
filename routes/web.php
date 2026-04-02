@@ -18,7 +18,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/calendar', Calendar::class)->name('calendar');
     Route::get('/tasks', MyTasks::class)->name('tasks');
     Route::get('/feeds', FeedManager::class)->name('feeds.manage');
-    Route::get('/projects/{project}', ProjectDetail::class)->name('projects.show');
+    // Named projects.detail (not projects.show) to avoid collision with apiResource in api.php
+    Route::get('/projects/{project}', ProjectDetail::class)->name('projects.detail');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

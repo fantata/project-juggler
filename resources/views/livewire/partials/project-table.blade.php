@@ -10,9 +10,9 @@
     </thead>
     <tbody class="bg-white dark:bg-gray-800 divide-y divide-cream-200 dark:divide-gray-700">
         @forelse($projects as $project)
-            <tr class="hover:bg-cream-50 dark:hover:bg-gray-700 cursor-pointer" onclick="window.location='{{ route('projects.show', $project) }}'">
+            <tr class="hover:bg-cream-50 dark:hover:bg-gray-700 cursor-pointer" onclick="window.location='{{ route('projects.detail', $project) }}'">
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <a href="{{ route('projects.show', $project) }}" class="text-bark-800 dark:text-cream-200 font-medium hover:text-terracotta-600 dark:hover:text-terracotta-400">
+                    <a href="{{ route('projects.detail', $project) }}" class="text-bark-800 dark:text-cream-200 font-medium hover:text-terracotta-600 dark:hover:text-terracotta-400">
                         {{ $project->name }}
                     </a>
                     @if($project->open_issue_count > 0)

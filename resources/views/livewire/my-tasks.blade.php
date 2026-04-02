@@ -93,7 +93,7 @@
                                 </span>
                                 <div class="flex items-center gap-2 mt-0.5">
                                     @if($item->type === 'task' && $item->parent_title)
-                                        <a href="{{ route('projects.show', $item->project_id) }}" wire:navigate class="text-xs text-terracotta-500 hover:text-terracotta-700 dark:text-terracotta-400">
+                                        <a href="{{ route('projects.detail', $item->project_id) }}" wire:navigate class="text-xs text-terracotta-500 hover:text-terracotta-700 dark:text-terracotta-400">
                                             {{ $item->parent_title }}
                                         </a>
                                     @endif

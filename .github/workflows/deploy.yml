@@ -1,4 +1,4 @@
-name: Deploy to Caprover
+name: Deploy to sv2
 
 on:
   push:
@@ -12,12 +12,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create tarball
-        run: tar --exclude='.git' --exclude='node_modules' --exclude='vendor' -cvf deploy.tar .
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SV2_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H 46.101.76.174 >> ~/.ssh/known_hosts
+        env:
+          SV2_KEY: ${{ secrets.SV2_SSH_KEY }}
 
-      - name: Deploy to Caprover
-        uses: caprover/deploy-from-github@v1.1.2
-        with:
-          server: https://captain.sv1.fantata.com
-          app: project-juggler
-          token: ${{ secrets.CAPROVER_APP_TOKEN }}
+      - name: Rsync to sv2
+        run: |
+          rsync -avz --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='vendor' \
+            --exclude='.env' \
+            --exclude='storage/logs' \
+            --exclude='storage/framework/sessions' \
+            --exclude='storage/framework/cache' \
+            ./ root@46.101.76.174:/srv/apps/project-juggler/
+
+      - name: Build and restart
+        run: |
+          ssh root@46.101.76.174 "cd /srv/apps/project-juggler && docker compose up -d --build"
