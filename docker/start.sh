@@ -28,6 +28,9 @@ php artisan migrate --force
 php artisan livewire:publish --assets
 
 # Cache config and routes for production (now with correct env vars)
+php artisan config:clear 2>/dev/null || true
+php artisan route:clear 2>/dev/null || true
+php artisan view:clear 2>/dev/null || true
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
