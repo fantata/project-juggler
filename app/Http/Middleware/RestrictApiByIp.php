@@ -37,10 +37,9 @@ class RestrictApiByIp
         $allowed = $this->allowedIps();
 
         if (empty(array_filter($allowed, fn($ip) => $ip !== '127.0.0.1' && $ip !== '::1'))) {
-            // No IPs configured beyond localhost — fail open with a log warning
-            // so a misconfigured deploy doesn't lock you out entirely
-            logger()->warning('RestrictApiByIp: ALLOWED_API_IPS is empty, allowing all IPs. Set this in .env to restrict access.');
-            return $next($request);
+            // No IPs configured beyond localhost — deny by default
+            logger()->warning('RestrictApiByIp: ALLOWED_API_IPS is empty. Set this in .env to allow external access.');
+            return response()->json(['error' => 'Forbidden — ALLOWED_API_IPS not configured'], 403);
         }
 
         if (!in_array($clientIp, $allowed, true)) {

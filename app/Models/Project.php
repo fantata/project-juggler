@@ -6,6 +6,7 @@ use App\Enums\MoneyStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProjectType;
 use App\Enums\RetainerFrequency;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -54,6 +55,11 @@ class Project extends Model
     public function issues(): HasMany
     {
         return $this->hasMany(Issue::class)->orderByDesc('created_at');
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->whereNotIn('status', ['complete', 'killed']);
     }
 
     public function markTouched(): bool

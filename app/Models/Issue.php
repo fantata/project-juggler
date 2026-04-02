@@ -37,14 +37,4 @@ class Issue extends Model
     {
         return $this->hasMany(IssueTask::class)->orderBy('position');
     }
-
-    public function completedTasksCount(): int
-    {
-        return $this->tasks()->where('is_complete', true)->count();
-    }
-
-    public function totalTasksCount(): int
-    {
-        return $this->tasks()->count();
-    }
 }

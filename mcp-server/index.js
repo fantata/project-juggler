@@ -3,18 +3,26 @@
 const readline = require('readline');
 const mysql = require('mysql2/promise');
 
-let db;
+const db = mysql.createPool({
+    host: process.env.DB_HOST || '127.0.0.1',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_DATABASE || 'project_juggler',
+    waitForConnections: true,
+    connectionLimit: 5,
+});
 
 async function getDb() {
-    if (!db) {
-        db = await mysql.createConnection({
-            host: process.env.DB_HOST || '127.0.0.1',
-            user: process.env.DB_USER || 'root',
-            password: process.env.DB_PASSWORD || '',
-            database: process.env.DB_DATABASE || 'project_juggler',
-        });
-    }
     return db;
+}
+
+// Helpers
+function formatDate(d) {
+    return d ? d.toISOString().split('T')[0] : null;
+}
+
+async function touchProject(conn, projectId) {
+    await conn.execute('UPDATE projects SET last_touched_at = NOW(), updated_at = NOW() WHERE id = ?', [projectId]);
 }
 
 async function parseEmail(rawEmail) {
@@ -450,13 +458,18 @@ async function handleToolCall(name, args) {
 
     switch (name) {
         case 'list_projects': {
-            let sql = `SELECT p.*, (SELECT COUNT(*) FROM issues WHERE issues.project_id = p.id AND issues.status IN ('open', 'in_progress')) as open_issue_count FROM projects p WHERE 1=1`;
+            let sql = `SELECT p.*, COUNT(i.id) as open_issue_count
+                FROM projects p
+                LEFT JOIN issues i ON i.project_id = p.id AND i.status IN ('open', 'in_progress')
+                WHERE 1=1`;
             const params = [];
             if (args.type) { sql += ' AND p.type = ?'; params.push(args.type); }
             if (args.status) { sql += ' AND p.status = ?'; params.push(args.status); }
             if (args.money_status) { sql += ' AND p.money_status = ?'; params.push(args.money_status); }
             if (args.waiting_on_client !== undefined) { sql += ' AND p.waiting_on_client = ?'; params.push(args.waiting_on_client ? 1 : 0); }
-            sql += ' ORDER BY CASE WHEN p.priority IS NULL THEN 1 ELSE 0 END, p.priority ASC, CASE WHEN p.money_status = "awaiting" THEN 0 ELSE 1 END, p.deadline ASC, p.money_value DESC, p.last_touched_at DESC';
+            sql += ` GROUP BY p.id
+                ORDER BY CASE WHEN p.priority IS NULL THEN 1 ELSE 0 END, p.priority ASC,
+                CASE WHEN p.money_status = 'awaiting' THEN 0 ELSE 1 END, p.deadline ASC, p.money_value DESC, p.last_touched_at DESC`;
             const [rows] = await conn.execute(sql, params);
             return {
                 count: rows.length,
@@ -469,7 +482,7 @@ async function handleToolCall(name, args) {
                     priority: p.priority,
                     money_status: p.money_status,
                     money_value: p.money_value,
-                    deadline: p.deadline ? p.deadline.toISOString().split('T')[0] : null,
+                    deadline: formatDate(p.deadline),
                     next_action: p.next_action,
                     github_repo: p.github_repo,
                     open_issue_count: p.open_issue_count,
@@ -515,7 +528,7 @@ async function handleToolCall(name, args) {
 
             return {
                 ...project,
-                deadline: project.deadline ? project.deadline.toISOString().split('T')[0] : null,
+                deadline: formatDate(project.deadline),
                 github_repo: project.github_repo,
                 ai_context: project.ai_context || null,
                 ai_context_updated_at: project.ai_context_updated_at || null,
@@ -568,7 +581,7 @@ async function handleToolCall(name, args) {
                 'INSERT INTO project_logs (project_id, entry, created_at, updated_at) VALUES (?, ?, NOW(), NOW())',
                 [project.id, args.entry]
             );
-            await conn.execute('UPDATE projects SET last_touched_at = NOW(), updated_at = NOW() WHERE id = ?', [project.id]);
+            await touchProject(conn, project.id);
             return { success: true, message: `Logged work on '${project.name}'`, project_id: project.id };
         }
 
@@ -590,7 +603,7 @@ async function handleToolCall(name, args) {
             return {
                 active_projects: active_count,
                 blocked_projects: { count: blocked.length, projects: blocked },
-                upcoming_deadlines: { count: deadlines.length, projects: deadlines.map(p => ({ ...p, deadline: p.deadline?.toISOString().split('T')[0] })) },
+                upcoming_deadlines: { count: deadlines.length, projects: deadlines.map(p => ({ ...p, deadline: formatDate(p.deadline) })) },
                 awaiting_money: { count: awaiting.length, total_value: total_awaiting, projects: awaiting },
                 open_issues: open_issue_count,
             };
@@ -642,7 +655,7 @@ async function handleToolCall(name, args) {
                 } catch (e) { /* GitHub push failed — issue still created locally */ }
             }
 
-            await conn.execute('UPDATE projects SET last_touched_at = NOW(), updated_at = NOW() WHERE id = ?', [project.id]);
+            await touchProject(conn, project.id);
 
             return { success: true, message: `Issue created on '${project.name}'${githubNumber ? ` (GitHub #${githubNumber})` : ''}`, issue_id: result.insertId, title, urgency, github_issue_number: githubNumber };
         }
@@ -681,7 +694,7 @@ async function handleToolCall(name, args) {
 
             const oldStatus = issue.status;
             await conn.execute(`UPDATE issues SET ${updates.join(', ')} WHERE id = ?`, params);
-            await conn.execute('UPDATE projects SET last_touched_at = NOW(), updated_at = NOW() WHERE id = ?', [issue.project_id]);
+            await touchProject(conn, issue.project_id);
 
             // Push status change to GitHub
             if (args.status && issue.github_issue_number) {
@@ -951,7 +964,7 @@ async function handleToolCall(name, args) {
 
             const days = Math.min(30, Math.max(1, parseInt(args.days) || 14));
             const repoFilter = args.repo || null;
-            const org = 'fantata';
+            const org = process.env.GITHUB_ORG || 'fantata';
 
             let commitsByRepo;
             try {
@@ -1051,4 +1064,7 @@ rl.on('line', async (line) => {
     }
 });
 
-rl.on('close', () => process.exit(0));
+rl.on('close', async () => {
+    await db.end();
+    process.exit(0);
+});

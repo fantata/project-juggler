@@ -41,32 +41,35 @@ class MyTasks extends Component
 
     public function render()
     {
-        $activeProjectFilter = function ($q) {
-            $q->whereNotIn('status', ['complete', 'killed']);
-        };
-
-        // Child tasks from issues that have sub-tasks (existing behaviour)
-        $taskQuery = IssueTask::with(['issue.project'])
-            ->whereHas('issue.project', $activeProjectFilter);
-
-        if (!$this->showCompleted) {
-            $taskQuery->where('is_complete', false);
-        }
-
-        $childTasks = $taskQuery->orderBy('is_complete')->orderBy('created_at', 'desc')->get();
-
-        // Standalone issues (no child tasks) - these are themselves the work item
-        $issueQuery = Issue::with('project')
-            ->doesntHave('tasks')
-            ->whereHas('project', $activeProjectFilter);
-
-        if (!$this->showCompleted) {
-            $issueQuery->whereIn('status', ['open', 'in_progress']);
-        }
-
-        $standaloneIssues = $issueQuery->orderByRaw("CASE WHEN status = 'done' THEN 1 ELSE 0 END")
+        // Child tasks from issues that have sub-tasks
+        // Always load all (including completed) so we can compute totals from the collection
+        $allChildTasks = IssueTask::with(['issue.project'])
+            ->whereHas('issue.project', fn($q) => $q->active())
+            ->orderBy('is_complete')
             ->orderBy('created_at', 'desc')
             ->get();
+
+        // Standalone issues (no child tasks)
+        $allStandaloneIssues = Issue::with('project')
+            ->doesntHave('tasks')
+            ->whereHas('project', fn($q) => $q->active())
+            ->orderByRaw("CASE WHEN status = 'done' THEN 1 ELSE 0 END")
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Compute totals from loaded collections (no extra queries)
+        $totalTasks = $allChildTasks->count() + $allStandaloneIssues->count();
+        $completedTasks = $allChildTasks->where('is_complete', true)->count()
+            + $allStandaloneIssues->where('status.value', 'done')->count();
+
+        // Filter for display if not showing completed
+        $childTasks = $this->showCompleted
+            ? $allChildTasks
+            : $allChildTasks->where('is_complete', false);
+
+        $standaloneIssues = $this->showCompleted
+            ? $allStandaloneIssues
+            : $allStandaloneIssues->whereIn('status.value', ['open', 'in_progress']);
 
         // Normalize into a unified collection
         $workItems = collect();
@@ -99,20 +102,8 @@ class MyTasks extends Component
             ]);
         }
 
-        $grouped = $workItems->groupBy('project_name');
-
-        // Counts include both types
-        $totalChildTasks = IssueTask::whereHas('issue.project', $activeProjectFilter)->count();
-        $completedChildTasks = IssueTask::whereHas('issue.project', $activeProjectFilter)->where('is_complete', true)->count();
-
-        $totalStandalone = Issue::doesntHave('tasks')->whereHas('project', $activeProjectFilter)->count();
-        $completedStandalone = Issue::doesntHave('tasks')->whereHas('project', $activeProjectFilter)->where('status', 'done')->count();
-
-        $totalTasks = $totalChildTasks + $totalStandalone;
-        $completedTasks = $completedChildTasks + $completedStandalone;
-
         return view('livewire.my-tasks', [
-            'tasksByProject' => $grouped,
+            'tasksByProject' => $workItems->groupBy('project_name'),
             'totalTasks' => $totalTasks,
             'completedTasks' => $completedTasks,
         ]);

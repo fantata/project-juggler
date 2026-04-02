@@ -29,6 +29,12 @@ class IcsFeedSyncService
             $vcalendar = Reader::read($response->body());
             $seenUids = [];
 
+            // Pre-load existing UIDs to avoid N+1 queries
+            $existingByUid = $feed->events()->pluck('id', 'uid');
+
+            // Collect all event data first
+            $upsertRows = [];
+
             foreach ($vcalendar->VEVENT ?? [] as $vevent) {
                 $uid = (string) ($vevent->UID ?? '');
                 if (! $uid) {
@@ -45,7 +51,10 @@ class IcsFeedSyncService
                 $endsAt = $vevent->DTEND ? $this->parseDateTime($vevent->DTEND) : null;
                 $isAllDay = $vevent->DTSTART && ! $vevent->DTSTART->hasTime();
 
-                $data = [
+                $isNew = ! $existingByUid->has($uid);
+
+                $upsertRows[] = [
+                    'ics_feed_id' => $feed->id,
                     'uid' => $uid,
                     'title' => (string) ($vevent->SUMMARY ?? 'Untitled'),
                     'description' => (string) ($vevent->DESCRIPTION ?? null),
@@ -55,16 +64,25 @@ class IcsFeedSyncService
                     'is_all_day' => $isAllDay,
                     'recurrence_rule' => $vevent->RRULE ? (string) $vevent->RRULE : null,
                     'raw_vevent' => $vevent->serialize(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ];
 
-                $existing = $feed->events()->where('uid', $uid)->first();
-
-                if ($existing) {
-                    $existing->update($data);
-                    $stats['updated']++;
-                } else {
-                    $feed->events()->create($data);
+                if ($isNew) {
                     $stats['created']++;
+                } else {
+                    $stats['updated']++;
+                }
+            }
+
+            // Bulk upsert — insert or update on unique(ics_feed_id, uid)
+            if (! empty($upsertRows)) {
+                foreach (array_chunk($upsertRows, 100) as $chunk) {
+                    IcsFeedEvent::upsert(
+                        $chunk,
+                        ['ics_feed_id', 'uid'],
+                        ['title', 'description', 'location', 'starts_at', 'ends_at', 'is_all_day', 'recurrence_rule', 'raw_vevent', 'updated_at']
+                    );
                 }
             }
 

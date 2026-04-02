@@ -33,12 +33,6 @@ class Calendar extends Component
         $this->enabledFeeds = IcsFeed::where('is_enabled', true)->pluck('id')->toArray();
     }
 
-    public function getEventsProperty(): array
-    {
-        // We'll pass all events to the frontend; FullCalendar handles date filtering
-        return [];
-    }
-
     #[On('calendar-fetch-events')]
     public function fetchEvents(string $start, string $end): array
     {
@@ -53,8 +47,8 @@ class Calendar extends Component
 
         foreach ($nativeEvents as $event) {
             if ($event->recurrence_rule) {
+                $duration = $event->ends_at ? $event->starts_at->diffInSeconds($event->ends_at) : 3600;
                 foreach ($event->occurrencesInRange($from, $to) as $occurrence) {
-                    $duration = $event->ends_at ? $event->starts_at->diffInSeconds($event->ends_at) : 3600;
                     $events[] = [
                         'id' => 'native-' . $event->id . '-' . $occurrence->timestamp,
                         'title' => $event->title,
@@ -93,7 +87,7 @@ class Calendar extends Component
             $deadlines = Project::whereNotNull('deadline')
                 ->whereNotIn('status', ['complete', 'killed'])
                 ->whereBetween('deadline', [$from, $to])
-                ->get();
+                ->get(['id', 'name', 'deadline']);
 
             foreach ($deadlines as $project) {
                 $events[] = [
@@ -112,16 +106,18 @@ class Calendar extends Component
             }
         }
 
-        // External feed events
-        foreach ($this->enabledFeeds as $feedId) {
-            $feed = IcsFeed::find($feedId);
-            if (! $feed) continue;
+        // External feed events — batch-load feeds instead of querying per feed
+        if (! empty($this->enabledFeeds)) {
+            $feeds = IcsFeed::whereIn('id', $this->enabledFeeds)->get(['id', 'name', 'color']);
+            $feedEventsAll = IcsFeedEvent::whereIn('ics_feed_id', $this->enabledFeeds)
+                ->inRange($from, $to)
+                ->get();
 
-            $feedEvents = $feed->events()->inRange($from, $to)->get();
+            $feedMap = $feeds->keyBy('id');
 
-            foreach ($feedEvents as $feedEvent) {
-                $opacity = $feedEvent->is_backgrounded ? '40' : 'ff';
-                $baseColor = $feed->color ?? '#9CA3AF';
+            foreach ($feedEventsAll as $feedEvent) {
+                $feed = $feedMap[$feedEvent->ics_feed_id] ?? null;
+                if (! $feed) continue;
 
                 $events[] = [
                     'id' => 'feed-' . $feedEvent->id,
@@ -129,7 +125,7 @@ class Calendar extends Component
                     'start' => $feedEvent->starts_at->toIso8601String(),
                     'end' => $feedEvent->ends_at?->toIso8601String(),
                     'allDay' => $feedEvent->is_all_day,
-                    'color' => $baseColor,
+                    'color' => $feed->color ?? '#9CA3AF',
                     'classNames' => $feedEvent->is_backgrounded ? ['opacity-30'] : ($feedEvent->is_relevant ? ['ring-2', 'ring-terracotta-400'] : []),
                     'extendedProps' => [
                         'type' => 'feed',
