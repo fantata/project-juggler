@@ -13,7 +13,13 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                sans: ['"Atkinson Hyperlegible Next"', ...defaultTheme.fontFamily.sans],
+            },
+            fontSize: {
+                xs: ['0.875rem', { lineHeight: '1.25rem' }],   // 14px — was 12px
+                sm: ['1rem', { lineHeight: '1.5rem' }],         // 16px — was 14px
+                base: ['1rem', { lineHeight: '1.5rem' }],       // 16px (unchanged)
+                lg: ['1.125rem', { lineHeight: '1.75rem' }],    // 18px (unchanged)
             },
             colors: {
                 cream: {
