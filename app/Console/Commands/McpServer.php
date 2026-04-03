@@ -187,7 +187,7 @@ class McpServer extends Command
         ],
         [
             'name' => 'quick_status',
-            'description' => 'Get a quick overview: active projects count, blocked projects, upcoming deadlines, projects awaiting money, open issues',
+            'description' => 'Get a quick overview: active projects count, blocked projects, projects awaiting money, open issues',
             'inputSchema' => [
                 'type' => 'object',
                 'properties' => [],
@@ -631,20 +631,6 @@ class McpServer extends Command
             ])
             ->toArray();
 
-        $upcomingDeadlines = Project::whereNotNull('deadline')
-            ->where('deadline', '<=', now()->addDays(7))
-            ->where('deadline', '>=', now())
-            ->whereNotIn('status', ['complete', 'killed'])
-            ->orderBy('deadline')
-            ->get(['id', 'name', 'deadline'])
-            ->map(fn($p) => [
-                'id' => $p->id,
-                'name' => $p->name,
-                'deadline' => $p->deadline->format('Y-m-d'),
-                'days_left' => $p->deadline->diffInDays(now()),
-            ])
-            ->toArray();
-
         $awaitingMoney = Project::where('money_status', 'awaiting')
             ->whereNotIn('status', ['complete', 'killed'])
             ->get(['id', 'name', 'money_value'])
@@ -666,10 +652,6 @@ class McpServer extends Command
             'blocked_projects' => [
                 'count' => count($blockedProjects),
                 'projects' => $blockedProjects,
-            ],
-            'upcoming_deadlines' => [
-                'count' => count($upcomingDeadlines),
-                'projects' => $upcomingDeadlines,
             ],
             'awaiting_money' => [
                 'count' => count($awaitingMoney),

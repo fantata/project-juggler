@@ -43,7 +43,7 @@ class ProjectController extends Controller
 
         $query->orderByRaw('CASE WHEN priority IS NULL THEN 1 ELSE 0 END')
             ->orderBy('priority', 'asc')
-            ->orderBy('deadline', 'asc');
+            ->orderBy('last_touched_at', 'desc');
 
         return ProjectResource::collection($query->get());
     }

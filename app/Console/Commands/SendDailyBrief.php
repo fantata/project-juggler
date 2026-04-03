@@ -66,10 +66,8 @@ class SendDailyBrief extends Command
         $active = Project::whereNotIn('status', ['complete', 'killed'])
             ->orderByRaw('CASE WHEN priority IS NULL THEN 1 ELSE 0 END')
             ->orderBy('priority')
-            ->orderBy('deadline')
             ->get();
 
-        $overdue = $active->filter(fn($p) => $p->deadline && $p->deadline->isPast());
         $awaitingMoney = $active->where('money_status', 'awaiting');
         $blocked = $active->where('status', 'blocked');
         $openIssues = Issue::whereIn('status', ['open', 'in_progress'])
@@ -81,13 +79,6 @@ class SendDailyBrief extends Command
         $lines = ["## Projects\n"];
 
         $lines[] = "**Active:** {$active->count()} projects, {$openIssues->count()} open issues";
-
-        if ($overdue->count()) {
-            $lines[] = "\n**OVERDUE:**";
-            foreach ($overdue as $p) {
-                $lines[] = "- {$p->name} (deadline: {$p->deadline->toDateString()}) — next: {$p->next_action}";
-            }
-        }
 
         if ($awaitingMoney->count()) {
             $total = $awaitingMoney->sum('money_value');
@@ -117,7 +108,6 @@ class SendDailyBrief extends Command
         $lines[] = "\n**All active projects (priority order):**";
         foreach ($active->take(12) as $p) {
             $flags = [];
-            if ($p->deadline) $flags[] = 'due ' . $p->deadline->toDateString();
             if ($p->money_status === 'awaiting') $flags[] = '£awaiting';
             if ($p->waiting_on_client) $flags[] = 'waiting-on-client';
             $flagStr = $flags ? ' [' . implode(', ', $flags) . ']' : '';
@@ -430,7 +420,7 @@ Below is a data snapshot from his systems. Your job is to produce a concise, act
 
 FORMAT RULES:
 - Lead with the single most important thing he should do first, and why
-- Flag anything genuinely urgent (overdue deadlines, overdue invoices, emails that need a reply today)
+- Flag anything genuinely urgent (overdue invoices, emails that need a reply today)
 - Group emails: identify which need action vs which are FYI
 - Note if energy from recent personal notes is low — suggest lighter tasks if so
 - Keep it scannable — bullets, not paragraphs

@@ -214,7 +214,7 @@ const tools = [
     },
     {
         name: 'quick_status',
-        description: 'Get overview: active count, blocked projects, upcoming deadlines, projects awaiting money, open issues',
+        description: 'Get overview: active count, blocked projects, projects awaiting money, open issues',
         inputSchema: { type: 'object', properties: {} },
     },
     {
@@ -419,7 +419,7 @@ async function handleToolCall(name, args) {
             if (args.waiting_on_client !== undefined) { sql += ' AND p.waiting_on_client = ?'; params.push(args.waiting_on_client ? 1 : 0); }
             sql += ` GROUP BY p.id
                 ORDER BY CASE WHEN p.priority IS NULL THEN 1 ELSE 0 END, p.priority ASC,
-                CASE WHEN p.money_status = 'awaiting' THEN 0 ELSE 1 END, p.deadline ASC, p.money_value DESC, p.last_touched_at DESC`;
+                CASE WHEN p.money_status = 'awaiting' THEN 0 ELSE 1 END, p.money_value DESC, p.last_touched_at DESC`;
             const [rows] = await conn.execute(sql, params);
             return {
                 count: rows.length,
@@ -538,9 +538,6 @@ async function handleToolCall(name, args) {
         case 'quick_status': {
             const [[{ active_count }]] = await conn.execute("SELECT COUNT(*) as active_count FROM projects WHERE status = 'active'");
             const [blocked] = await conn.execute("SELECT id, name, next_action FROM projects WHERE status = 'blocked'");
-            const [deadlines] = await conn.execute(
-                "SELECT id, name, deadline FROM projects WHERE deadline IS NOT NULL AND deadline <= DATE_ADD(NOW(), INTERVAL 7 DAY) AND deadline >= CURDATE() AND status NOT IN ('complete', 'killed') ORDER BY deadline"
-            );
             const [awaiting] = await conn.execute(
                 "SELECT id, name, money_value FROM projects WHERE money_status = 'awaiting' AND status NOT IN ('complete', 'killed')"
             );
@@ -553,7 +550,6 @@ async function handleToolCall(name, args) {
             return {
                 active_projects: active_count,
                 blocked_projects: { count: blocked.length, projects: blocked },
-                upcoming_deadlines: { count: deadlines.length, projects: deadlines.map(p => ({ ...p, deadline: formatDate(p.deadline) })) },
                 awaiting_money: { count: awaiting.length, total_value: total_awaiting, projects: awaiting },
                 open_issues: open_issue_count,
             };

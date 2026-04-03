@@ -9,16 +9,13 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         @foreach($projects as $project)
             @php
-                $daysToDeadline = $project->deadline ? now()->diffInDays($project->deadline, false) : null;
-                $isOverdue = $daysToDeadline !== null && $daysToDeadline < 0;
-                $isUrgent = $daysToDeadline !== null && $daysToDeadline >= 0 && $daysToDeadline <= 7;
                 $isPriority = $project->priority && $project->priority <= 2;
             @endphp
 
             <a
                 href="{{ route('projects.detail', $project) }}"
                 wire:navigate
-                class="group relative bg-white dark:bg-gray-800 rounded-xl border border-cream-200 dark:border-gray-700 p-5 hover:shadow-md hover:border-{{ $accent }}-300 dark:hover:border-{{ $accent }}-600 transition-all duration-200 {{ $isOverdue ? 'border-l-4 border-l-red-400' : ($isUrgent ? 'border-l-4 border-l-amber-400' : ($isPriority ? 'border-l-4 border-l-terracotta-400' : '')) }}"
+                class="group relative bg-white dark:bg-gray-800 rounded-xl border border-cream-200 dark:border-gray-700 p-5 hover:shadow-md hover:border-{{ $accent }}-300 dark:hover:border-{{ $accent }}-600 transition-all duration-200 {{ $isPriority ? 'border-l-4 border-l-terracotta-400' : '' }}"
             >
                 <!-- Project name + type -->
                 <div class="flex items-start justify-between gap-2 mb-3">
@@ -67,21 +64,11 @@
 
                 <!-- Deadline -->
                 @if($project->deadline)
-                    <div class="mt-3 flex items-center gap-2 text-xs {{ $isOverdue ? 'text-red-500 font-semibold' : ($isUrgent ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-gray-400 dark:text-gray-500') }}">
+                    <div class="mt-3 flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        @if($isOverdue)
-                            {{ abs($daysToDeadline) }} days overdue
-                        @elseif($daysToDeadline == 0)
-                            Due today
-                        @elseif($daysToDeadline == 1)
-                            Due tomorrow
-                        @elseif($isUrgent)
-                            {{ $daysToDeadline }} days left
-                        @else
-                            {{ $project->deadline->format('j M Y') }}
-                        @endif
+                        {{ $project->deadline->format('j M Y') }}
                     </div>
                 @endif
 

@@ -16,7 +16,7 @@ Generate a token from Profile > API Token in the web UI.
 
 ### GET /status
 
-Overview dashboard — project counts, upcoming deadlines, money owed.
+Overview dashboard — project counts, money owed, open issues.
 
 Response:
 ```json
@@ -26,9 +26,6 @@ Response:
   "waiting_on_client": 2,
   "open_issues": 3,
   "incomplete_tasks": 7,
-  "upcoming_deadlines": [
-    { "id": 12, "name": "EFATS", "deadline": "2026-02-20", "status": "active" }
-  ],
   "awaiting_money": [
     { "id": 1, "name": "Robbie the Trader", "money_value": "1100.00" }
   ],

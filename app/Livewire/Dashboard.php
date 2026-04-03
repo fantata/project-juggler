@@ -60,7 +60,6 @@ class Dashboard extends Component
         $activeProjects = $commonSort((clone $baseQuery)
             ->where('waiting_on_client', false)
             ->where('is_retainer', false))
-            ->orderBy('deadline', 'asc')
             ->orderBy('money_value', 'desc')
             ->get();
 
