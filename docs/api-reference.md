@@ -103,9 +103,8 @@ Response includes tasks nested under each issue.
 
 ### POST /projects/{id}/issues
 
-Create an issue. Two modes:
+Create an issue.
 
-**Manual:**
 ```json
 {
   "title": "Fix login page",
@@ -115,12 +114,7 @@ Create an issue. Two modes:
 }
 ```
 
-**AI email parsing** — send `raw_email` and it auto-extracts title, description, urgency, and tasks:
-```json
-{
-  "raw_email": "Hi Chris, the checkout is broken again..."
-}
-```
+Required: `title`. Everything else optional. Defaults: `status=open`, `urgency=medium`.
 
 ### PATCH /issues/{id}
 

@@ -16,7 +16,6 @@ class Issue extends Model
         'description',
         'status',
         'urgency',
-        'raw_email',
         'github_issue_number',
     ];
 

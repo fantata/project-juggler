@@ -25,60 +25,6 @@ async function touchProject(conn, projectId) {
     await conn.execute('UPDATE projects SET last_touched_at = NOW(), updated_at = NOW() WHERE id = ?', [projectId]);
 }
 
-async function parseEmail(rawEmail) {
-    const apiKey = process.env.GROQ_API_KEY;
-
-    if (!apiKey) {
-        return fallbackParse(rawEmail);
-    }
-
-    try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
-                max_tokens: 1024,
-                messages: [
-                    {
-                        role: 'user',
-                        content: `Extract structured data from this client email. Return ONLY valid JSON (no markdown, no code fences) with these fields:\n- title: a short summary of what the client needs (max 100 chars)\n- description: bullet-point action items extracted from the email\n- urgency: one of 'low', 'medium', 'high' based on the tone and content\n\nEmail:\n${rawEmail}`,
-                    },
-                ],
-            }),
-        });
-
-        const data = await response.json();
-        let text = data.choices?.[0]?.message?.content || '';
-
-        // Strip markdown code fences if present
-        text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-
-        const parsed = JSON.parse(text);
-
-        if (!parsed || !parsed.title) {
-            return fallbackParse(rawEmail);
-        }
-
-        // Handle description as array (bullet points) or string
-        let description = parsed.description || null;
-        if (Array.isArray(description)) {
-            description = description.map(item => `• ${item}`).join('\n');
-        }
-
-        return {
-            title: parsed.title.substring(0, 255),
-            description,
-            urgency: ['low', 'medium', 'high'].includes(parsed.urgency) ? parsed.urgency : 'medium',
-        };
-    } catch (e) {
-        return fallbackParse(rawEmail);
-    }
-}
-
 // GitHub API helpers
 function githubConfigured() {
     return !!process.env.GITHUB_TOKEN;
@@ -184,15 +130,6 @@ async function githubGetRecentCommits(org, days, repoFilter) {
     return commitsByRepo;
 }
 
-function fallbackParse(rawEmail) {
-    const lines = rawEmail.trim().split('\n');
-    return {
-        title: (lines[0] || 'Untitled issue').substring(0, 255),
-        description: rawEmail,
-        urgency: 'medium',
-    };
-}
-
 const tools = [
     {
         name: 'list_projects',
@@ -282,18 +219,18 @@ const tools = [
     },
     {
         name: 'create_issue',
-        description: 'Create an issue/ticket on a project. Either provide a title directly, or provide raw_email to have AI parse it into a structured issue.',
+        description: 'Create an issue/ticket on a project.',
         inputSchema: {
             type: 'object',
             properties: {
                 project_id: { type: 'integer', description: 'Project ID' },
                 project_name: { type: 'string', description: 'Project name (fuzzy match)' },
-                title: { type: 'string', description: 'Issue title (optional if raw_email provided)' },
+                title: { type: 'string', description: 'Issue title' },
                 description: { type: 'string', description: 'Issue description / action items' },
                 urgency: { type: 'string', description: 'Issue urgency', enum: ['low', 'medium', 'high'] },
-                raw_email: { type: 'string', description: 'Raw client email text. If provided without a title, AI will parse it.' },
                 tasks: { type: 'array', description: 'Array of task descriptions to create as sub-tasks on the issue', items: { type: 'string' } },
             },
+            required: ['title'],
         },
     },
     {
@@ -626,22 +563,15 @@ async function handleToolCall(name, args) {
             const project = await findProject({ id: args.project_id, name: args.project_name });
             if (!project) return { error: 'Project not found' };
 
-            let title = args.title || null;
-            let description = args.description || null;
-            let urgency = args.urgency || 'medium';
+            const title = args.title;
+            const description = args.description || null;
+            const urgency = args.urgency || 'medium';
 
-            if (args.raw_email && !title) {
-                const parsed = await parseEmail(args.raw_email);
-                title = parsed.title;
-                description = description || parsed.description;
-                urgency = parsed.urgency;
-            }
-
-            if (!title) return { error: 'Title is required (or provide raw_email for AI parsing)' };
+            if (!title) return { error: 'Title is required' };
 
             const [result] = await conn.execute(
-                'INSERT INTO issues (project_id, title, description, status, urgency, raw_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())',
-                [project.id, title, description, 'open', urgency, args.raw_email || null]
+                'INSERT INTO issues (project_id, title, description, status, urgency, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())',
+                [project.id, title, description, 'open', urgency]
             );
 
             // Create tasks if provided

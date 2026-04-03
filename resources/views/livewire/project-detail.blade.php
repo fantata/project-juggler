@@ -190,33 +190,6 @@
                                 </select>
                             </div>
 
-                            <details class="border border-cream-200 dark:border-gray-600 rounded-lg">
-                                <summary class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-bark-600 dark:hover:text-cream-200">
-                                    Parse from client email
-                                </summary>
-                                <div class="px-3 pb-3 pt-1">
-                                    <textarea wire:model.live="newIssueEmail" rows="4" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 shadow-sm focus:border-terracotta-400 focus:ring-terracotta-400 sm:text-sm" placeholder="Paste email..."></textarea>
-                                    <button wire:click="parseEmail" wire:loading.attr="disabled" wire:target="parseEmail" class="mt-2 px-3 py-1.5 text-sm font-medium text-bark-600 dark:text-bark-300 bg-bark-100 dark:bg-bark-900/30 rounded-lg hover:bg-bark-200 disabled:opacity-50">
-                                        <span wire:loading.remove wire:target="parseEmail">Parse with AI</span>
-                                        <span wire:loading wire:target="parseEmail">Parsing...</span>
-                                    </button>
-                                </div>
-                            </details>
-
-                            @if(count($newIssueTasks) > 0)
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Extracted Tasks ({{ count($newIssueTasks) }})</label>
-                                    <div class="bg-white dark:bg-gray-800 border border-cream-200 dark:border-gray-600 rounded-lg p-2 space-y-1">
-                                        @foreach($newIssueTasks as $task)
-                                            <div class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                                <svg class="w-4 h-4 text-moss-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                <span>{{ $task }}</span>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            @endif
-
                             <div class="flex justify-end">
                                 <button wire:click="createIssue" class="px-4 py-2 text-sm font-medium text-white bg-terracotta-500 rounded-lg hover:bg-terracotta-600 transition-colors">Create Issue</button>
                             </div>
@@ -293,18 +266,6 @@
                                         </div>
                                     </div>
 
-                                    @if($issue->raw_email)
-                                        <div class="pl-6 flex items-center gap-2 mb-2">
-                                            <button wire:click="reparseIssue({{ $issue->id }})" wire:loading.attr="disabled" wire:target="reparseIssue({{ $issue->id }})" class="text-xs px-2 py-1 bg-bark-100 dark:bg-bark-900/30 text-bark-600 dark:text-bark-400 rounded-lg hover:bg-bark-200">
-                                                <span wire:loading.remove wire:target="reparseIssue({{ $issue->id }})">Re-parse with AI</span>
-                                                <span wire:loading wire:target="reparseIssue({{ $issue->id }})">Parsing...</span>
-                                            </button>
-                                        </div>
-                                        <details class="pl-6">
-                                            <summary class="text-xs text-gray-400 cursor-pointer hover:text-bark-600 dark:hover:text-cream-200">Original email</summary>
-                                            <div class="mt-1 p-2 bg-cream-50 dark:bg-gray-900 rounded-lg text-xs whitespace-pre-wrap">{{ $issue->raw_email }}</div>
-                                        </details>
-                                    @endif
                                     <p class="text-xs text-gray-400 mt-2 pl-6">{{ $issue->created_at->format('j M Y, g:ia') }}</p>
                                 </div>
                             </div>

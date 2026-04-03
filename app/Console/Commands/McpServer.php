@@ -8,7 +8,6 @@ use App\Enums\ProjectType;
 use App\Models\Issue;
 use App\Models\IssueTask;
 use App\Models\Project;
-use App\Services\EmailParser;
 use App\Services\GitHubService;
 use Illuminate\Console\Command;
 
@@ -196,7 +195,7 @@ class McpServer extends Command
         ],
         [
             'name' => 'create_issue',
-            'description' => 'Create an issue/ticket on a project. Either provide a title directly, or provide raw_email to have AI parse it into a structured issue.',
+            'description' => 'Create an issue/ticket on a project.',
             'inputSchema' => [
                 'type' => 'object',
                 'properties' => [
@@ -210,7 +209,7 @@ class McpServer extends Command
                     ],
                     'title' => [
                         'type' => 'string',
-                        'description' => 'Issue title (optional if raw_email provided)',
+                        'description' => 'Issue title',
                     ],
                     'description' => [
                         'type' => 'string',
@@ -221,16 +220,13 @@ class McpServer extends Command
                         'description' => 'Issue urgency',
                         'enum' => ['low', 'medium', 'high'],
                     ],
-                    'raw_email' => [
-                        'type' => 'string',
-                        'description' => 'Raw client email text. If provided without a title, AI will parse it to extract title, description, and urgency.',
-                    ],
                     'tasks' => [
                         'type' => 'array',
                         'description' => 'Array of task descriptions to create as sub-tasks on the issue',
                         'items' => ['type' => 'string'],
                     ],
                 ],
+                'required' => ['title'],
             ],
         ],
         [
@@ -698,18 +694,9 @@ class McpServer extends Command
         $title = $args['title'] ?? null;
         $description = $args['description'] ?? null;
         $urgency = $args['urgency'] ?? 'medium';
-        $parsedTasks = [];
-
-        if (!empty($args['raw_email']) && empty($title)) {
-            $parsed = EmailParser::parse($args['raw_email']);
-            $title = $parsed['title'];
-            $description = $description ?? $parsed['description'];
-            $urgency = $parsed['urgency'];
-            $parsedTasks = $parsed['tasks'] ?? [];
-        }
 
         if (empty($title)) {
-            return ['error' => 'Title is required (or provide raw_email for AI parsing)'];
+            return ['error' => 'Title is required'];
         }
 
         $issue = $project->issues()->create([
@@ -717,11 +704,10 @@ class McpServer extends Command
             'description' => $description,
             'status' => 'open',
             'urgency' => $urgency,
-            'raw_email' => $args['raw_email'] ?? null,
         ]);
 
-        // Create tasks if provided (explicit tasks take priority over parsed ones)
-        $tasks = !empty($args['tasks']) ? $args['tasks'] : $parsedTasks;
+        // Create tasks if provided
+        $tasks = !empty($args['tasks']) ? $args['tasks'] : [];
         foreach ($tasks as $position => $taskDescription) {
             if (!empty(trim($taskDescription))) {
                 $issue->tasks()->create([
