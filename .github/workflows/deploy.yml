@@ -15,15 +15,23 @@ jobs:
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
-          echo "$SV2_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SV2_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H 46.101.76.174 >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<CFG
+          Host sv2
+            HostName 46.101.76.174
+            User root
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+          CFG
         env:
           SV2_KEY: ${{ secrets.SV2_SSH_KEY }}
 
       - name: Rsync to sv2
         run: |
           rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key" \
             --exclude='.git' \
             --exclude='node_modules' \
             --exclude='vendor' \
@@ -35,4 +43,4 @@ jobs:
 
       - name: Build and restart
         run: |
-          ssh root@46.101.76.174 "cd /srv/apps/project-juggler && docker compose up -d --build"
+          ssh -i ~/.ssh/deploy_key root@46.101.76.174 "cd /srv/apps/project-juggler && docker compose up -d --build"
