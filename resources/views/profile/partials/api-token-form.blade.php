@@ -13,7 +13,9 @@
         @csrf
         <input type="hidden" name="type" value="api">
 
-        @if (auth()->user()->api_token)
+        @php($hasToken = auth()->user()->tokens()->exists())
+
+        @if ($hasToken)
             <p class="text-sm text-gray-500">
                 Token is set. Generate a new one to replace it.
             </p>
@@ -32,7 +34,7 @@
 
         <div class="flex items-center gap-4">
             <x-primary-button>
-                {{ auth()->user()->api_token ? __('Regenerate Token') : __('Generate Token') }}
+                {{ $hasToken ? __('Regenerate Token') : __('Generate Token') }}
             </x-primary-button>
         </div>
     </form>

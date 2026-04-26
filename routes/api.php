@@ -11,7 +11,7 @@ use App\Http\Controllers\Api\StatusController;
 use App\Http\Controllers\Api\TaskController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth.api')->group(function () {
+Route::middleware('auth:sanctum')->group(function () {
     // Overview
     Route::get('/status', StatusController::class);
 

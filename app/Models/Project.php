@@ -27,6 +27,8 @@ class Project extends Model
         'next_action',
         'notes',
         'github_repo',
+        'ai_context',
+        'ai_context_updated_at',
         'last_touched_at',
     ];
 
@@ -38,6 +40,7 @@ class Project extends Model
             'money_status' => MoneyStatus::class,
             'money_value' => 'decimal:2',
             'deadline' => 'date',
+            'ai_context_updated_at' => 'datetime',
             'last_touched_at' => 'datetime',
             'waiting_on_client' => 'boolean',
             'is_retainer' => 'boolean',

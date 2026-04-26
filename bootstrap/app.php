@@ -14,7 +14,6 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
         $middleware->alias([
-            'auth.api' => \App\Http\Middleware\AuthenticateApiToken::class,
             'api.ip' => \App\Http\Middleware\RestrictApiByIp::class,
         ]);
         // Apply IP restriction to all API routes in production

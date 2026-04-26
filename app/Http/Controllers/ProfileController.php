@@ -41,9 +41,10 @@ class ProfileController extends Controller
     public function generateToken(Request $request): RedirectResponse
     {
         $type = $request->input('type', 'api');
-        $plainToken = Str::random(64);
 
         if ($type === 'ics') {
+            $plainToken = Str::random(64);
+
             $request->user()->update([
                 'ics_feed_token' => hash('sha256', $plainToken),
             ]);
@@ -51,11 +52,10 @@ class ProfileController extends Controller
             return Redirect::route('profile.edit')->with('ics_token', $plainToken);
         }
 
-        $request->user()->update([
-            'api_token' => hash('sha256', $plainToken),
-        ]);
+        $request->user()->tokens()->delete();
+        $token = $request->user()->createToken('api');
 
-        return Redirect::route('profile.edit')->with('api_token', $plainToken);
+        return Redirect::route('profile.edit')->with('api_token', $token->plainTextToken);
     }
 
     /**
