@@ -489,11 +489,51 @@ PROMPT;
         $session   = now()->hour < 13 ? 'Morning' : 'Afternoon';
         $date      = now()->format('D j M');
         $recipient = config('brief.recipient_email', env('ADMIN_EMAIL', 'chris@fantata.com'));
+        $subject   = "📋 {$session} Brief — {$date}";
 
-        Mail::raw($brief, function ($message) use ($recipient, $session, $date) {
+        $html = $this->wrapHtml((string) \Illuminate\Support\Str::markdown($brief), $subject);
+
+        Mail::html($html, function ($message) use ($recipient, $subject) {
             $message->to($recipient)
-                ->subject("📋 {$session} Brief — {$date}")
+                ->subject($subject)
                 ->from(env('MAIL_FROM_ADDRESS', 'brief@fantata.com'), 'Project Juggler');
         });
+    }
+
+    /**
+     * Minimal inline-styled HTML shell for the brief. Matches the look of
+     * Pulsinator's brief email so the two feel like a pair.
+     */
+    private function wrapHtml(string $bodyHtml, string $title): string
+    {
+        $bg = '#FAF7F0';
+        $surface = '#FFFFFF';
+        $ink = '#1F1F1F';
+        $mute = '#665E50';
+        $rule = '#E5DCC8';
+
+        return <<<HTML
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{$title}</title>
+</head>
+<body style="margin:0;padding:24px;background:{$bg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:{$ink};line-height:1.55;">
+  <div style="max-width:640px;margin:0 auto;background:{$surface};padding:32px 28px;border:1px solid {$rule};">
+    <div style="font-family:ui-monospace,Menlo,monospace;font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:{$mute};margin-bottom:24px;">
+      Project Juggler · {$title}
+    </div>
+    <div style="font-size:16px;color:{$ink};">
+      {$bodyHtml}
+    </div>
+    <hr style="border:none;border-top:1px solid {$rule};margin:32px 0 16px;">
+    <div style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:{$mute};">
+      Sent automatically by Project Juggler. Reply with corrections.
+    </div>
+  </div>
+</body>
+</html>
+HTML;
     }
 }
