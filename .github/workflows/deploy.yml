@@ -12,6 +12,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+
+      - name: Notify Pulsinator (start)
+        if: ${{ env.PULSINATOR_DEPLOY_URL != '' }}
+        env:
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          REF: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PULSINATOR_DEPLOY_URL: ${{ secrets.PULSINATOR_DEPLOY_URL }}
+          PULSINATOR_DEPLOY_TOKEN: ${{ secrets.PULSINATOR_DEPLOY_TOKEN }}
+        run: |
+          curl -fsSL --max-time 10 -X POST "$PULSINATOR_DEPLOY_URL" \
+            -H "Authorization: Bearer $PULSINATOR_DEPLOY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg repo "$REPO" --arg run_id "$RUN_ID" \
+              --arg ref "$REF" --arg sha "$SHA" \
+              --arg msg "$COMMIT_MSG" --arg actor "$ACTOR" \
+              --arg url "$WORKFLOW_URL" \
+              '{repo:$repo, run_id:$run_id, ref:$ref, sha:$sha, commit_message:$msg, actor:$actor, environment:"production", status:"started", workflow_run_url:$url}')" \
+            || echo "Pulsinator notify (start) failed - continuing"
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
@@ -44,3 +68,25 @@ jobs:
       - name: Build and restart
         run: |
           ssh -i ~/.ssh/deploy_key root@46.101.76.174 "cd /srv/apps/project-juggler && docker compose up -d --build"
+
+      - name: Notify Pulsinator (finish)
+        if: ${{ always() && env.PULSINATOR_DEPLOY_URL != '' }}
+        env:
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          JOB_STATUS: ${{ job.status }}
+          PULSINATOR_DEPLOY_URL: ${{ secrets.PULSINATOR_DEPLOY_URL }}
+          PULSINATOR_DEPLOY_TOKEN: ${{ secrets.PULSINATOR_DEPLOY_TOKEN }}
+        run: |
+          case "$JOB_STATUS" in
+            success)   STATUS=succeeded ;;
+            failure)   STATUS=failed ;;
+            cancelled) STATUS=cancelled ;;
+            *)         STATUS=failed ;;
+          esac
+          curl -fsSL --max-time 10 -X POST "$PULSINATOR_DEPLOY_URL" \
+            -H "Authorization: Bearer $PULSINATOR_DEPLOY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg repo "$REPO" --arg run_id "$RUN_ID" --arg status "$STATUS" \
+              '{repo:$repo, run_id:$run_id, status:$status}')" \
+            || echo "Pulsinator notify (finish) failed - non-fatal"
