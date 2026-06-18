@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DueBucket;
 use App\Enums\IssueStatus;
 use App\Enums\IssueUrgency;
 use Illuminate\Database\Eloquent\Model;
@@ -16,6 +17,8 @@ class Issue extends Model
         'description',
         'status',
         'urgency',
+        'due_bucket',
+        'is_question',
         'github_issue_number',
     ];
 
@@ -24,6 +27,8 @@ class Issue extends Model
         return [
             'status' => IssueStatus::class,
             'urgency' => IssueUrgency::class,
+            'due_bucket' => DueBucket::class,
+            'is_question' => 'boolean',
         ];
     }
 

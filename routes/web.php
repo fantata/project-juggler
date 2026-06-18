@@ -7,6 +7,7 @@ use App\Livewire\Dashboard;
 use App\Livewire\FeedManager;
 use App\Livewire\MyTasks;
 use App\Livewire\ProjectDetail;
+use App\Livewire\Together;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -17,6 +18,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', Dashboard::class)->name('dashboard');
     Route::get('/calendar', Calendar::class)->name('calendar');
     Route::get('/tasks', MyTasks::class)->name('tasks');
+    Route::get('/together', Together::class)->name('together.index');
     Route::get('/feeds', FeedManager::class)->name('feeds.manage');
     // Named projects.detail (not projects.show) to avoid collision with apiResource in api.php
     Route::get('/projects/{project}', ProjectDetail::class)->name('projects.detail');

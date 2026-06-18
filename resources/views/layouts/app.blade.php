@@ -62,6 +62,15 @@
                         My Tasks
                     </x-sidebar-link>
 
+                    <x-sidebar-link :href="route('together.index')" :active="request()->routeIs('together.*')">
+                        <x-slot name="icon">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/>
+                            </svg>
+                        </x-slot>
+                        Together
+                    </x-sidebar-link>
+
                     <x-sidebar-link :href="route('feeds.manage')" :active="request()->routeIs('feeds.*')">
                         <x-slot name="icon">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -133,6 +142,12 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                         <span class="text-xs font-medium">Tasks</span>
+                    </a>
+                    <a href="{{ route('together.index') }}" wire:navigate class="flex flex-col items-center gap-1 px-3 py-2 {{ request()->routeIs('together.*') ? 'text-terracotta-600 dark:text-terracotta-400' : 'text-gray-400 dark:text-gray-500' }}">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/>
+                        </svg>
+                        <span class="text-xs font-medium">Together</span>
                     </a>
                     <a href="{{ route('feeds.manage') }}" wire:navigate class="flex flex-col items-center gap-1 px-3 py-2 {{ request()->routeIs('feeds.*') ? 'text-terracotta-600 dark:text-terracotta-400' : 'text-gray-400 dark:text-gray-500' }}">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">

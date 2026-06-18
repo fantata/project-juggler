@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide Alpine-controlled elements until Alpine initialises */
+[x-cloak] {
+    display: none !important;
+}
+
 /* FullCalendar warm theme overrides */
 .fc-warm {
     --fc-border-color: #F0E8D4;
