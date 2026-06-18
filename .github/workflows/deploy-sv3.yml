@@ -1,0 +1,43 @@
+name: Deploy to sv3
+
+# Manual only. sv3 (Hetzner) is the deferred migration target; this workflow is
+# opt-in via the Actions "Run workflow" button so a push to main never ships here
+# (main still auto-deploys to sv2 via deploy.yml).
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SV3_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H 138.201.33.178 >> ~/.ssh/known_hosts
+        env:
+          SV3_KEY: ${{ secrets.SV3_SSH_KEY }}
+
+      - name: Rsync to sv3
+        run: |
+          rsync -avz \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='vendor' \
+            --exclude='.env' \
+            --exclude='compose*.yml' \
+            --exclude='docker-compose*.yml' \
+            --exclude='storage/logs' \
+            --exclude='storage/framework/sessions' \
+            --exclude='storage/framework/cache' \
+            ./ chris@138.201.33.178:/home/chris/apps/project-juggler/
+
+      - name: Build and restart
+        run: |
+          ssh -i ~/.ssh/deploy_key chris@138.201.33.178 \
+            "cd /home/chris/apps/project-juggler && docker compose -f docker-compose.sv3.yml up -d --build"
