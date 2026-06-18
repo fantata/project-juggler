@@ -9,6 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
+            // Drop the unique index first so SQLite can rebuild the table cleanly.
+            $table->dropUnique('users_api_token_unique');
             $table->dropColumn('api_token');
         });
     }
