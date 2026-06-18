@@ -7,6 +7,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "fantata/auth": "@dev",
         "laravel/framework": "^13.0",
         "laravel/mcp": "^0.7.0",
         "laravel/sanctum": "^4.3",
@@ -76,6 +77,15 @@
             "dont-discover": []
         }
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "packages/fantata-auth",
+            "options": {
+                "symlink": false
+            }
+        }
+    ],
     "config": {
         "optimize-autoloader": true,
         "preferred-install": "dist",

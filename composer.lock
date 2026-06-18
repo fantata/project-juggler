@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "49175ac16a7b37d56f4719569e6a2c05",
+    "content-hash": "8f81224ff4bba8979a2f0dc9d42f52bd",
     "packages": [
         {
             "name": "brick/math",
@@ -507,6 +507,48 @@
                 }
             ],
             "time": "2025-03-06T22:45:56+00:00"
+        },
+        {
+            "name": "fantata/auth",
+            "version": "dev-feature/fantata-auth",
+            "dist": {
+                "type": "path",
+                "url": "packages/fantata-auth",
+                "reference": "a8d46df7ca4554f765aa373e427a3eff22673fdf"
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.8",
+                "illuminate/support": "^11.0|^12.0|^13.0",
+                "php": "^8.3"
+            },
+            "require-dev": {
+                "livewire/livewire": "^3.0|^4.0",
+                "orchestra/testbench": "^9.0|^10.0"
+            },
+            "suggest": {
+                "livewire/livewire": "Required for the bundled passkey login/account Livewire components"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Fantata\\Auth\\FantataAuthServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Fantata\\Auth\\": "src/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "description": "FantataID passkey auth for Laravel apps — login & account in your own UI, on your own domain.",
+            "transport-options": {
+                "symlink": false,
+                "relative": true
+            }
         },
         {
             "name": "fruitcake/php-cors",
@@ -8646,7 +8688,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "fantata/auth": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
