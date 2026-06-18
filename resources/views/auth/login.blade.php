@@ -2,6 +2,29 @@
     <!-- Session Status -->
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
+    @if (config('fantata.auth'))
+        <div class="fantata-auth space-y-4">
+            <livewire:fantata-passkey-login />
+
+            <details class="text-sm text-gray-600">
+                <summary class="cursor-pointer select-none">{{ __('First time on this device? Enrol a passkey.') }}</summary>
+                <div class="mt-3">
+                    <livewire:fantata-passkey-register />
+                </div>
+            </details>
+        </div>
+
+        <!-- Email and password stays available as a fallback -->
+        <div class="relative my-6">
+            <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                <div class="w-full border-t border-gray-200"></div>
+            </div>
+            <div class="relative flex justify-center">
+                <span class="bg-white px-3 text-sm text-gray-500">{{ __('or use your password') }}</span>
+            </div>
+        </div>
+    @endif
+
     <form method="POST" action="{{ route('login') }}">
         @csrf
 
