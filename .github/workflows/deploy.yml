@@ -1,9 +1,13 @@
-name: Deploy to sv2
+name: Deploy to sv3
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-sv3-project-juggler
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -11,36 +15,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up SSH
+        env:
+          SV3_KEY: ${{ secrets.SV3_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "$SV2_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$SV3_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H 46.101.76.174 >> ~/.ssh/known_hosts
-          cat >> ~/.ssh/config <<CFG
-          Host sv2
-            HostName 46.101.76.174
-            User root
-            IdentityFile ~/.ssh/deploy_key
-            StrictHostKeyChecking no
-          CFG
-        env:
-          SV2_KEY: ${{ secrets.SV2_SSH_KEY }}
-
-      - name: Rsync to sv2
+          ssh-keyscan -H 138.201.33.178 >> ~/.ssh/known_hosts 2>/dev/null
+      - name: Rsync code to sv3
         run: |
-          rsync -avz --delete \
-            -e "ssh -i ~/.ssh/deploy_key" \
-            --exclude='.git' \
-            --exclude='node_modules' \
-            --exclude='vendor' \
-            --exclude='.env' \
-            --exclude='storage/logs' \
-            --exclude='storage/framework/sessions' \
-            --exclude='storage/framework/cache' \
-            ./ root@46.101.76.174:/srv/apps/project-juggler/
-
-      - name: Build and restart
+          rsync -az -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
+            --exclude='.git' --exclude='.github' --exclude='node_modules' --exclude='vendor' \
+            --exclude='.env' --exclude='.env.*' \
+            --exclude='docker-compose.yml' --exclude='docker-compose.sv3.yml' --exclude='compose.yml' --exclude='compose.yaml' \
+            --exclude='public/build' --exclude='public/hot' --exclude='public/storage' \
+            --exclude='database/database.sqlite' \
+            --exclude='storage/logs/*' --exclude='storage/framework/cache/data/*' --exclude='storage/framework/sessions/*' --exclude='storage/framework/views/*' \
+            --exclude='.DS_Store' --exclude='.phpunit.result.cache' \
+            ./ chris@138.201.33.178:/home/chris/apps/project-juggler/
+      - name: Build, restart, migrate
         run: |
-          ssh -i ~/.ssh/deploy_key root@46.101.76.174 "cd /srv/apps/project-juggler && docker compose up -d --build"
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no chris@138.201.33.178 \
+            "cd /home/chris/apps/project-juggler && docker compose -f docker-compose.sv3.yml up -d --build && docker exec project-juggler php artisan migrate --force && docker exec project-juggler php artisan config:clear && docker exec project-juggler php artisan view:clear"
+      - name: Smoke check
+        run: curl -fsS -o /dev/null -w 'HTTP %{http_code}\n' https://project-juggler.sv3.fantata.com/ || true
