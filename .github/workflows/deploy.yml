@@ -26,7 +26,7 @@ jobs:
       - name: Rsync code to sv3
         run: |
           rsync -az -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
-            --exclude='.git' --exclude='.github' --exclude='node_modules' --exclude='vendor' \
+            --exclude='.git' --exclude='.github' --exclude='node_modules' --exclude='/vendor' \
             --exclude='.env' --exclude='.env.*' \
             --exclude='docker-compose.yml' --exclude='docker-compose.sv3.yml' --exclude='compose.yml' --exclude='compose.yaml' \
             --exclude='public/build' --exclude='public/hot' --exclude='public/storage' \
