@@ -17,6 +17,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Mock Login (dev only)
+    |--------------------------------------------------------------------------
+    |
+    | Enables the one-click "log in as the primary user" shortcut on the login
+    | screen so we can iterate on the app without auth friction while the real
+    | FantataID auth is parked. Always on in local; set MOCK_LOGIN=true to also
+    | enable it on another non-production environment. MUST stay false in prod.
+    |
+    */
+
+    'mock_login' => env('MOCK_LOGIN', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

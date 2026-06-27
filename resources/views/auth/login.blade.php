@@ -2,6 +2,25 @@
     <!-- Session Status -->
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
+    {{-- DEV ONLY — mock login shortcut (hidden in production, see config/app.php) --}}
+    @if (app()->environment('local') || config('app.mock_login'))
+        <form method="POST" action="{{ route('dev.login') }}">
+            @csrf
+            <x-primary-button class="w-full justify-center">
+                {{ __('Log in as Chris (dev)') }}
+            </x-primary-button>
+        </form>
+
+        <div class="relative my-6">
+            <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                <div class="w-full border-t border-gray-200 dark:border-gray-700"></div>
+            </div>
+            <div class="relative flex justify-center">
+                <span class="bg-white dark:bg-gray-800 px-3 text-sm text-gray-500 dark:text-gray-400">{{ __('or sign in normally') }}</span>
+            </div>
+        </div>
+    @endif
+
     @if (config('fantata.auth'))
         <div class="fantata-auth space-y-4">
             <livewire:fantata-passkey-login />
