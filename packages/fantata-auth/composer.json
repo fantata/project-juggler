@@ -1,0 +1,32 @@
+{
+    "name": "fantata/auth",
+    "description": "FantataID passkey auth for Laravel apps — login & account in your own UI, on your own domain.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.3",
+        "illuminate/support": "^11.0|^12.0|^13.0",
+        "guzzlehttp/guzzle": "^7.8"
+    },
+    "require-dev": {
+        "livewire/livewire": "^3.0|^4.0",
+        "orchestra/testbench": "^9.0|^10.0"
+    },
+    "suggest": {
+        "livewire/livewire": "Required for the bundled passkey login/account Livewire components"
+    },
+    "autoload": {
+        "psr-4": {
+            "Fantata\\Auth\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Fantata\\Auth\\FantataAuthServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
