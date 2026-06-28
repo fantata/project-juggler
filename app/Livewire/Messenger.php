@@ -3,7 +3,9 @@
 namespace App\Livewire;
 
 use App\Models\Message;
+use App\Models\Project;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -15,7 +17,12 @@ class Messenger extends Component
     /** The message currently being replied to, if any. */
     public ?int $replyingTo = null;
 
-    /** Which room: null = the shared Together room, otherwise a project thread. */
+    /**
+     * Which room: null = the shared Together room, otherwise a project thread.
+     * Locked so the client can't retag a live component into another room — it's
+     * server-set in mount and trusted thereafter.
+     */
+    #[Locked]
     public ?int $projectId = null;
 
     /** The reaction palette — a little Dogface theatre tucked in there. */
@@ -23,6 +30,11 @@ class Messenger extends Component
 
     public function mount(?int $projectId = null): void
     {
+        // A project room must point at a real project.
+        if ($projectId !== null) {
+            abort_unless(Project::whereKey($projectId)->exists(), 404);
+        }
+
         $this->projectId = $projectId;
     }
 

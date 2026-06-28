@@ -81,6 +81,18 @@ class MessengerTest extends TestCase
             ->assertDontSee('Panto room only');
     }
 
+    public function test_the_room_cannot_be_retagged_by_the_client(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $a = Project::create(['name' => 'A', 'type' => 'personal', 'status' => 'active']);
+        $b = Project::create(['name' => 'B', 'type' => 'personal', 'status' => 'active']);
+
+        // projectId is #[Locked] — a tampered client update is refused.
+        $this->expectException(\Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException::class);
+
+        Livewire::test(Messenger::class, ['projectId' => $a->id])->set('projectId', $b->id);
+    }
+
     public function test_different_emojis_stack(): void
     {
         $user = User::factory()->create();
