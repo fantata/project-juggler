@@ -286,4 +286,76 @@ class BoardTest extends TestCase
 
         $this->assertTrue($issue->fresh()->is_question);
     }
+
+    public function test_a_comment_can_be_posted_on_a_card(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Card', 'board_column' => 'todo']);
+
+        Livewire::test(Board::class, ['project' => $project])
+            ->call('openCard', $issue->id)
+            ->set('commentBody', 'Looks good to me')
+            ->call('addComment')
+            ->assertHasNoErrors()
+            ->assertSet('commentBody', '');
+
+        $comment = $issue->comments()->first();
+        $this->assertSame('Looks good to me', $comment->body);
+        $this->assertSame($user->id, $comment->user_id);
+        $this->assertNull($comment->parent_id);
+    }
+
+    public function test_a_comment_can_be_a_reply(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Card', 'board_column' => 'todo']);
+        $parent = $issue->comments()->create(['user_id' => $user->id, 'body' => 'First']);
+
+        Livewire::test(Board::class, ['project' => $project])
+            ->call('openCard', $issue->id)
+            ->call('startCommentReply', $parent->id)
+            ->assertSet('replyToComment', $parent->id)
+            ->set('commentBody', 'A reply')
+            ->call('addComment');
+
+        $reply = $issue->comments()->where('body', 'A reply')->first();
+        $this->assertSame($parent->id, $reply->parent_id);
+    }
+
+    public function test_you_can_only_delete_your_own_comment(): void
+    {
+        $me = User::factory()->create();
+        $danny = User::factory()->create();
+        $this->actingAs($me);
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Card', 'board_column' => 'todo']);
+        $hers = $issue->comments()->create(['user_id' => $danny->id, 'body' => 'Hands off']);
+        $mine = $issue->comments()->create(['user_id' => $me->id, 'body' => 'Mine to bin']);
+
+        $component = Livewire::test(Board::class, ['project' => $project])->call('openCard', $issue->id);
+        $component->call('deleteComment', $hers->id);
+        $component->call('deleteComment', $mine->id);
+
+        $this->assertDatabaseHas('comments', ['id' => $hers->id]);
+        $this->assertDatabaseMissing('comments', ['id' => $mine->id]);
+    }
+
+    public function test_empty_comment_is_rejected(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Card', 'board_column' => 'todo']);
+
+        Livewire::test(Board::class, ['project' => $project])
+            ->call('openCard', $issue->id)
+            ->set('commentBody', '   ')
+            ->call('addComment')
+            ->assertHasErrors('commentBody');
+
+        $this->assertSame(0, $issue->comments()->count());
+    }
 }

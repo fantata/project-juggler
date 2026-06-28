@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Mail\QuestionAsked;
 use App\Models\Attachment;
+use App\Models\Comment;
 use App\Models\Issue;
 use App\Models\Project;
 use App\Models\User;
@@ -25,6 +26,12 @@ class Board extends Component
 
     /** Transient confirmation shown in the open card (e.g. after asking). */
     public ?string $flash = null;
+
+    /** Comment composer on the open card. */
+    public string $commentBody = '';
+
+    /** The comment being replied to, if any. */
+    public ?int $replyToComment = null;
 
     /**
      * Fixed kanban columns for v1: key => label. Customisable columns can come
@@ -76,15 +83,66 @@ class Board extends Component
     {
         // Only open cards that belong to this project.
         $this->openCardId = $this->project->issues()->whereKey($issueId)->value('id');
-        $this->files = [];
-        $this->flash = null;
+        $this->reset('files', 'flash', 'commentBody', 'replyToComment');
     }
 
     public function closeCard(): void
     {
-        $this->openCardId = null;
-        $this->files = [];
-        $this->flash = null;
+        $this->reset('openCardId', 'files', 'flash', 'commentBody', 'replyToComment');
+    }
+
+    public function startCommentReply(int $commentId): void
+    {
+        $this->replyToComment = $this->openCardComments()->whereKey($commentId)->value('id');
+    }
+
+    public function cancelCommentReply(): void
+    {
+        $this->replyToComment = null;
+    }
+
+    public function addComment(): void
+    {
+        if ($this->openCardId === null) {
+            return;
+        }
+
+        $this->commentBody = trim($this->commentBody);
+        $this->validate(['commentBody' => 'required|string|max:2000']);
+
+        $issue = $this->project->issues()->findOrFail($this->openCardId);
+
+        // A reply only counts if its parent is a comment on this same card.
+        $parentId = $this->replyToComment === null
+            ? null
+            : $issue->comments()->whereKey($this->replyToComment)->value('id');
+
+        $issue->comments()->create([
+            'user_id' => auth()->id(),
+            'parent_id' => $parentId,
+            'body' => $this->commentBody,
+        ]);
+
+        $this->reset('commentBody', 'replyToComment');
+        $this->project->update(['last_touched_at' => now()]);
+    }
+
+    public function deleteComment(int $commentId): void
+    {
+        // Only your own comments, and only on this project's cards.
+        $comment = $this->openCardComments()
+            ->where('id', $commentId)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        $comment?->delete();
+    }
+
+    /** Comments across this project's cards — the scope every comment action checks. */
+    private function openCardComments()
+    {
+        return Comment::where('commentable_type', Issue::class)
+            ->whereIn('commentable_id', $this->project->issues()->select('id'));
     }
 
     /**
@@ -181,7 +239,13 @@ class Board extends Component
         // Group by column, treating a missing column as the first working list.
         $cards = $issues->groupBy(fn (Issue $i) => $i->board_column ?: 'todo');
 
-        $openCard = $this->openCardId === null ? null : Issue::with(['assignee', 'attachments.uploader'])
+        $openCard = $this->openCardId === null ? null : Issue::with([
+            'assignee',
+            'attachments.uploader',
+            'comments' => fn ($q) => $q->whereNull('parent_id')
+                ->with(['user', 'replies' => fn ($r) => $r->with('user')->oldest()])
+                ->oldest(),
+        ])
             ->where('project_id', $this->project->id)
             ->find($this->openCardId);
 

@@ -1,0 +1,20 @@
+{{-- One comment row. Expects: $comment, $depth (0 = top-level, 1 = reply). --}}
+<div class="flex items-start justify-between gap-2 group">
+    <div class="min-w-0">
+        <p class="text-sm text-bark-800 dark:text-cream-100 whitespace-pre-wrap break-words">{{ $comment->body }}</p>
+        <div class="flex items-center gap-2 mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+            <span class="font-medium text-gray-500 dark:text-gray-400">{{ $comment->user->name }}</span>
+            <span>&middot;</span>
+            <span>{{ $comment->created_at->diffForHumans() }}</span>
+            @if ($depth === 0)
+                <button type="button" wire:click="startCommentReply({{ $comment->id }})" class="hover:text-bark-600 dark:hover:text-cream-200">Reply</button>
+            @endif
+        </div>
+    </div>
+    @if ($comment->user_id === auth()->id())
+        <button type="button" wire:click="deleteComment({{ $comment->id }})" wire:confirm="Delete this comment?"
+                class="shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 text-gray-300 dark:text-gray-600 hover:text-red-500 transition" aria-label="Delete comment">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+    @endif
+</div>

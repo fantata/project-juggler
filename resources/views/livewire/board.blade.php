@@ -243,6 +243,42 @@
                         @error('files') <p class="text-sm text-red-500 mt-1">{{ $message }}</p> @enderror
                         @error('files.*') <p class="text-sm text-red-500 mt-1">{{ $message }}</p> @enderror
                     </div>
+
+                    {{-- Discussion --}}
+                    <div>
+                        <h4 class="text-sm font-semibold text-bark-700 dark:text-cream-200 mb-2">Discussion</h4>
+
+                        @forelse ($openCard->comments as $comment)
+                            <div wire:key="comment-{{ $comment->id }}" class="mb-3">
+                                @include('livewire.partials.board-comment', ['comment' => $comment, 'depth' => 0])
+                                @foreach ($comment->replies as $reply)
+                                    <div wire:key="comment-{{ $reply->id }}" class="ml-4 mt-2 pl-3 border-l-2 border-cream-200 dark:border-gray-700">
+                                        @include('livewire.partials.board-comment', ['comment' => $reply, 'depth' => 1])
+                                    </div>
+                                @endforeach
+                            </div>
+                        @empty
+                            <p class="text-sm text-gray-400 dark:text-gray-500 mb-3">No comments yet — start the thread.</p>
+                        @endforelse
+
+                        @if ($replyToComment)
+                            <div class="flex items-center justify-between gap-2 px-3 py-1.5 mb-1 rounded-lg bg-cream-100 dark:bg-gray-700/60 text-sm text-bark-600 dark:text-gray-300">
+                                <span class="truncate">Replying to a comment…</span>
+                                <button type="button" wire:click="cancelCommentReply" class="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" aria-label="Cancel reply">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
+                            </div>
+                        @endif
+
+                        <form wire:submit="addComment" class="flex items-end gap-2">
+                            <label for="comment-body" class="sr-only">Add a comment</label>
+                            <textarea wire:model="commentBody" id="comment-body" rows="1"
+                                placeholder="{{ $replyToComment ? 'Write a reply…' : 'Add a comment…' }}"
+                                class="flex-1 resize-none rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 shadow-sm focus:border-terracotta-400 focus:ring-terracotta-400 text-sm"></textarea>
+                            <button type="submit" class="shrink-0 rounded-xl bg-terracotta-500 text-white px-4 py-2 text-sm font-medium hover:bg-terracotta-600">Post</button>
+                        </form>
+                        @error('commentBody') <p class="text-sm text-red-500 mt-1">{{ $message }}</p> @enderror
+                    </div>
                 </div>
             </div>
         </div>
