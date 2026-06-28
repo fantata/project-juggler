@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Issue;
 use App\Models\Project;
+use App\Models\User;
 use Livewire\Component;
 
 class Board extends Component
@@ -41,6 +42,21 @@ class Board extends Component
         $this->project->update(['last_touched_at' => now()]);
     }
 
+    /**
+     * Assign a card to a user, or pass null to clear it. Only touches cards on
+     * this project, and only allows real users.
+     */
+    public function assignCard(int $issueId, ?int $userId): void
+    {
+        if ($userId !== null && ! User::whereKey($userId)->exists()) {
+            return;
+        }
+
+        $issue = $this->project->issues()->findOrFail($issueId);
+        $issue->update(['assignee_id' => $userId]);
+        $this->project->update(['last_touched_at' => now()]);
+    }
+
     public function render()
     {
         $issues = Issue::where('project_id', $this->project->id)
@@ -59,6 +75,7 @@ class Board extends Component
         return view('livewire.board', [
             'columns' => self::COLUMNS,
             'cards' => $cards,
+            'users' => User::orderBy('name')->get(['id', 'name']),
         ]);
     }
 }

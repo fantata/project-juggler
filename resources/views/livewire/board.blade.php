@@ -51,12 +51,44 @@
 
                                 <span class="flex-1"></span>
 
-                                @if ($card->assignee)
-                                    <span title="{{ $card->assignee->name }}"
-                                          class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-moss-500 text-white text-xs font-semibold">
-                                        {{ $card->assignee->initials }}
-                                    </span>
-                                @endif
+                                {{-- Assignee picker: tap the chip to assign a person --}}
+                                <div x-data="{ open: false }" class="relative">
+                                    <button type="button" @click="open = !open"
+                                            title="{{ $card->assignee?->name ?? 'Assign' }}"
+                                            class="block rounded-full focus:outline-none focus:ring-2 focus:ring-terracotta-400">
+                                        @if ($card->assignee)
+                                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-moss-500 text-white text-xs font-semibold">
+                                                {{ $card->assignee->initials }}
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full border border-dashed border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 text-xs">+</span>
+                                        @endif
+                                    </button>
+
+                                    <div x-show="open" x-cloak @click.outside="open = false"
+                                         x-transition.origin.top.right
+                                         class="absolute right-0 mt-1 w-44 py-1 rounded-lg shadow-lg z-20
+                                                bg-white dark:bg-gray-800 border border-cream-200 dark:border-gray-700">
+                                        @foreach ($users as $u)
+                                            <button type="button" @click="open = false"
+                                                    wire:click="assignCard({{ $card->id }}, {{ $u->id }})"
+                                                    class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-bark-700 dark:text-cream-200 hover:bg-cream-100 dark:hover:bg-gray-700">
+                                                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-moss-500 text-white text-xs font-semibold shrink-0">{{ $u->initials }}</span>
+                                                <span class="flex-1 truncate">{{ $u->name }}</span>
+                                                @if ($card->assignee_id === $u->id)
+                                                    <svg class="w-4 h-4 text-moss-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                                @endif
+                                            </button>
+                                        @endforeach
+                                        @if ($card->assignee)
+                                            <button type="button" @click="open = false"
+                                                    wire:click="assignCard({{ $card->id }}, null)"
+                                                    class="w-full px-3 py-2 text-sm text-left text-gray-500 dark:text-gray-400 hover:bg-cream-100 dark:hover:bg-gray-700 border-t border-cream-100 dark:border-gray-700/60">
+                                                Unassign
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
 
                             {{-- Mobile-friendly move controls (tap to shift columns).

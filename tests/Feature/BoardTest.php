@@ -81,4 +81,32 @@ class BoardTest extends TestCase
 
         $this->assertSame('todo', $issue->fresh()->board_column);
     }
+
+    public function test_a_card_can_be_assigned_and_unassigned(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $danny = User::factory()->create(['name' => 'Danny']);
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Sound design', 'board_column' => 'todo']);
+
+        $component = Livewire::test(Board::class, ['project' => $project]);
+
+        $component->call('assignCard', $issue->id, $danny->id);
+        $this->assertSame($danny->id, $issue->fresh()->assignee_id);
+
+        $component->call('assignCard', $issue->id, null);
+        $this->assertNull($issue->fresh()->assignee_id);
+    }
+
+    public function test_assigning_an_unknown_user_is_ignored(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'X', 'board_column' => 'todo']);
+
+        Livewire::test(Board::class, ['project' => $project])
+            ->call('assignCard', $issue->id, 99999);
+
+        $this->assertNull($issue->fresh()->assignee_id);
+    }
 }
