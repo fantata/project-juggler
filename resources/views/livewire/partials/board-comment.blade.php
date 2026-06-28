@@ -9,7 +9,33 @@
             @if ($depth === 0)
                 <button type="button" wire:click="startCommentReply({{ $comment->id }})" class="hover:text-bark-600 dark:hover:text-cream-200">Reply</button>
             @endif
+            <div x-data="{ pick: false }" class="relative">
+                <button type="button" @click="pick = !pick" class="hover:text-bark-600 dark:hover:text-cream-200" aria-label="React to comment">React</button>
+                <div x-show="pick" x-cloak @click.outside="pick = false" x-transition
+                     class="absolute z-20 top-full mt-1 left-0 flex gap-1 p-1.5 rounded-full bg-white dark:bg-gray-800 border border-cream-200 dark:border-gray-700 shadow-lg">
+                    @foreach ($emojis as $emoji)
+                        <button type="button" @click="pick = false" wire:click="reactToComment({{ $comment->id }}, '{{ $emoji }}')"
+                                class="text-lg leading-none hover:scale-125 transition-transform">{{ $emoji }}</button>
+                    @endforeach
+                </div>
+            </div>
         </div>
+
+        @if ($comment->reactions->isNotEmpty())
+            <div class="flex flex-wrap gap-1 mt-1">
+                @foreach ($comment->reactions->groupBy('emoji') as $emoji => $reacts)
+                    @php $mine = $reacts->contains('user_id', auth()->id()); @endphp
+                    <button type="button" wire:click="reactToComment({{ $comment->id }}, '{{ $emoji }}')"
+                            @class([
+                                'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs border transition',
+                                'bg-terracotta-50 dark:bg-terracotta-900/30 border-terracotta-300 dark:border-terracotta-700 text-terracotta-700 dark:text-terracotta-300' => $mine,
+                                'bg-cream-100 dark:bg-gray-700 border-cream-200 dark:border-gray-600 text-bark-600 dark:text-gray-300' => ! $mine,
+                            ])>
+                        <span class="leading-none">{{ $emoji }}</span><span class="leading-none">{{ $reacts->count() }}</span>
+                    </button>
+                @endforeach
+            </div>
+        @endif
     </div>
     @if ($comment->user_id === auth()->id())
         <button type="button" wire:click="deleteComment({{ $comment->id }})" wire:confirm="Delete this comment?"

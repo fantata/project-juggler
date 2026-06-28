@@ -44,6 +44,9 @@ class Board extends Component
         'done' => 'Done',
     ];
 
+    /** Reaction palette for comments (mirrors the chat). */
+    public const EMOJIS = ['👍', '❤️', '😂', '🎭', '🙌', '🔥'];
+
     public function mount(Project $project): void
     {
         $this->project = $project;
@@ -136,6 +139,33 @@ class Board extends Component
             ->first();
 
         $comment?->delete();
+    }
+
+    /** Toggle the current user's emoji reaction on a comment. */
+    public function reactToComment(int $commentId, string $emoji): void
+    {
+        if (! in_array($emoji, self::EMOJIS, true)) {
+            return;
+        }
+
+        $comment = $this->openCardComments()->where('id', $commentId)->first();
+
+        if ($comment === null) {
+            return;
+        }
+
+        $existing = $comment->reactions()
+            ->where('user_id', auth()->id())
+            ->where('emoji', $emoji)
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+
+            return;
+        }
+
+        $comment->reactions()->create(['user_id' => auth()->id(), 'emoji' => $emoji]);
     }
 
     /** Comments across this project's cards — the scope every comment action checks. */
@@ -243,7 +273,7 @@ class Board extends Component
             'assignee',
             'attachments.uploader',
             'comments' => fn ($q) => $q->whereNull('parent_id')
-                ->with(['user', 'replies' => fn ($r) => $r->with('user')->oldest()])
+                ->with(['user', 'reactions', 'replies' => fn ($r) => $r->with(['user', 'reactions'])->oldest()])
                 ->oldest(),
         ])
             ->where('project_id', $this->project->id)
@@ -254,6 +284,7 @@ class Board extends Component
             'cards' => $cards,
             'users' => User::orderBy('name')->get(['id', 'name']),
             'openCard' => $openCard,
+            'emojis' => self::EMOJIS,
         ]);
     }
 }

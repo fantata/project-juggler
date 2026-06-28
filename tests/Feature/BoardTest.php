@@ -344,6 +344,23 @@ class BoardTest extends TestCase
         $this->assertDatabaseMissing('comments', ['id' => $mine->id]);
     }
 
+    public function test_a_comment_can_be_reacted_to_and_toggled(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Card', 'board_column' => 'todo']);
+        $comment = $issue->comments()->create(['user_id' => $user->id, 'body' => 'Nice']);
+
+        $component = Livewire::test(Board::class, ['project' => $project])->call('openCard', $issue->id);
+
+        $component->call('reactToComment', $comment->id, '🎭');
+        $this->assertSame(1, $comment->reactions()->count());
+
+        $component->call('reactToComment', $comment->id, '🎭');
+        $this->assertSame(0, $comment->reactions()->count());
+    }
+
     public function test_empty_comment_is_rejected(): void
     {
         $this->actingAs(User::factory()->create());
