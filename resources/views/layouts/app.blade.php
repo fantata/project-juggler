@@ -14,6 +14,16 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=atkinson-hyperlegible-next:400,500,600,700&display=swap" rel="stylesheet" />
 
+        {{-- Seed the theme before paint to avoid a flash: saved choice, else OS. --}}
+        <script>
+            (function () {
+                const t = localStorage.getItem('theme');
+                if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.classList.add('dark');
+                }
+            })();
+        </script>
+
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @livewireStyles
@@ -83,6 +93,8 @@
 
                 <!-- User Section -->
                 <div class="px-3 py-4 border-t border-cream-200 dark:border-gray-700">
+                    <x-theme-toggle class="w-full mb-1 px-3 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-terracotta-600 dark:hover:text-terracotta-400 hover:bg-cream-100 dark:hover:bg-gray-700 rounded-lg transition-colors" />
+
                     <x-sidebar-link :href="route('profile.edit')" :active="request()->routeIs('profile.*')">
                         <x-slot name="icon">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -121,6 +133,10 @@
                     {{ $slot }}
                 </main>
             </div>
+
+            <!-- Mobile theme toggle (floats above the bottom tabs) -->
+            <x-theme-toggle :show-label="false"
+                class="md:hidden fixed bottom-20 right-4 z-30 w-11 h-11 justify-center rounded-full bg-white dark:bg-gray-800 border border-cream-200 dark:border-gray-700 shadow-lg text-gray-500 dark:text-gray-300" />
 
             <!-- Mobile Bottom Tabs -->
             <nav class="md:hidden fixed bottom-0 inset-x-0 bg-white dark:bg-gray-800 border-t border-cream-200 dark:border-gray-700 z-30 safe-area-bottom">

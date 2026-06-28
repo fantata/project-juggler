@@ -3,7 +3,9 @@ import forms from '@tailwindcss/forms';
 
 /** @type {import('tailwindcss').Config} */
 export default {
-    darkMode: 'media',
+    // Class-based so we can offer a manual light/dark toggle (the early script
+    // in the layouts seeds the class from saved preference or the OS).
+    darkMode: 'class',
     content: [
         './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
         './storage/framework/views/*.php',
