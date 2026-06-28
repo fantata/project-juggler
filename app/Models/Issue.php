@@ -16,6 +16,10 @@ class Issue extends Model
         'title',
         'description',
         'status',
+        'assignee_id',
+        'kind',
+        'board_column',
+        'position',
         'urgency',
         'due_bucket',
         'is_question',
@@ -29,12 +33,18 @@ class Issue extends Model
             'urgency' => IssueUrgency::class,
             'due_bucket' => DueBucket::class,
             'is_question' => 'boolean',
+            'position' => 'integer',
         ];
     }
 
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assignee_id');
     }
 
     public function tasks(): HasMany

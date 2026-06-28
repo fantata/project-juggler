@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\IcsController;
 use App\Http\Controllers\ProfileController;
+use App\Livewire\Board;
 use App\Livewire\Calendar;
 use App\Livewire\Dashboard;
 use App\Livewire\FeedManager;
@@ -22,6 +23,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/feeds', FeedManager::class)->name('feeds.manage');
     // Named projects.detail (not projects.show) to avoid collision with apiResource in api.php
     Route::get('/projects/{project}', ProjectDetail::class)->name('projects.detail');
+    Route::get('/projects/{project}/board', Board::class)->name('projects.board');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
