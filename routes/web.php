@@ -37,10 +37,14 @@ Route::middleware(['auth'])->group(function () {
 // ICS feed (public, authenticated by unique token in URL)
 Route::get('/ics/{token}.ics', IcsController::class)->name('ics.feed');
 
-// One-click yes/no answer from the emailed link. No login — the signed URL is
-// the auth (the signature ties it to this issue + answer).
-Route::get('/questions/{issue}/answer/{answer}', QuestionAnswerController::class)
+// Yes/no answer from the emailed link. No login — the signed URL is the auth.
+// GET shows a confirmation page (safe for link pre-fetch); POST commits the
+// answer (CSRF-protected, human-initiated).
+Route::get('/questions/{issue}/answer/{answer}', [QuestionAnswerController::class, 'show'])
     ->name('questions.answer')
+    ->middleware('signed');
+Route::post('/questions/{issue}/answer/{answer}', [QuestionAnswerController::class, 'store'])
+    ->name('questions.answer.commit')
     ->middleware('signed');
 
 require __DIR__.'/auth.php';

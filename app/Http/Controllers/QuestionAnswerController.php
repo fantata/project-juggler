@@ -3,16 +3,38 @@
 namespace App\Http\Controllers;
 
 use App\Models\Issue;
+use Illuminate\Support\Facades\URL;
 use Illuminate\View\View;
 
 class QuestionAnswerController extends Controller
 {
     /**
-     * Record a one-click yes/no answer from the emailed link. The route's
-     * 'signed' middleware is the auth here — the signature ties the link to
-     * this exact issue + answer, so no login is needed.
+     * Show a confirmation page for the emailed link. This is a GET, so it must
+     * be side-effect free: email security scanners pre-fetch links, and a GET
+     * that recorded the answer would let a scanner auto-answer (or, fetching
+     * both links, set whichever ran last). The actual write happens on POST.
      */
-    public function __invoke(Issue $issue, string $answer): View
+    public function show(Issue $issue, string $answer): View
+    {
+        abort_unless(in_array($answer, ['yes', 'no'], true), 404);
+        abort_unless($issue->is_question, 404);
+
+        return view('questions.confirm', [
+            'issue' => $issue,
+            'answer' => $answer,
+            'commitUrl' => URL::signedRoute('questions.answer.commit', [
+                'issue' => $issue->id,
+                'answer' => $answer,
+            ]),
+        ]);
+    }
+
+    /**
+     * Record the answer. Reached only by the human pressing Confirm — a POST,
+     * so it carries a CSRF token and can't be triggered by a link pre-fetch.
+     * The 'signed' middleware still validates the signature.
+     */
+    public function store(Issue $issue, string $answer): View
     {
         abort_unless(in_array($answer, ['yes', 'no'], true), 404);
         abort_unless($issue->is_question, 404);

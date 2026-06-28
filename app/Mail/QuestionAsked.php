@@ -26,15 +26,18 @@ class QuestionAsked extends Mailable
 
     public function content(): Content
     {
-        // Signed links let the recipient answer in one click, no login. The
-        // signature is the auth — it ties the link to this issue + answer.
+        // Signed links let the recipient answer without logging in — the
+        // signature is the auth. They land on a confirmation page (the write
+        // is a POST), and expire after two weeks to limit any replay window.
+        $expiry = now()->addDays(14);
+
         return new Content(
             markdown: 'mail.question-asked',
             with: [
                 'issue' => $this->issue,
                 'asker' => $this->issue->project->name,
-                'yesUrl' => URL::signedRoute('questions.answer', ['issue' => $this->issue->id, 'answer' => 'yes']),
-                'noUrl' => URL::signedRoute('questions.answer', ['issue' => $this->issue->id, 'answer' => 'no']),
+                'yesUrl' => URL::temporarySignedRoute('questions.answer', $expiry, ['issue' => $this->issue->id, 'answer' => 'yes']),
+                'noUrl' => URL::temporarySignedRoute('questions.answer', $expiry, ['issue' => $this->issue->id, 'answer' => 'no']),
             ],
         );
     }

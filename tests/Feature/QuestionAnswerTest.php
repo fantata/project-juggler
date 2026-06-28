@@ -23,12 +23,25 @@ class QuestionAnswerTest extends TestCase
         ]);
     }
 
-    public function test_a_signed_link_records_the_answer_without_login(): void
+    public function test_the_get_link_shows_a_confirmation_without_recording(): void
     {
         $issue = $this->question();
         $url = URL::signedRoute('questions.answer', ['issue' => $issue->id, 'answer' => 'yes']);
 
+        // A GET (incl. an email scanner's pre-fetch) must NOT mutate.
         $this->get($url)
+            ->assertOk()
+            ->assertSee('Confirm');
+
+        $this->assertNull($issue->fresh()->answer);
+    }
+
+    public function test_confirming_via_post_records_the_answer(): void
+    {
+        $issue = $this->question();
+        $commitUrl = URL::signedRoute('questions.answer.commit', ['issue' => $issue->id, 'answer' => 'yes']);
+
+        $this->post($commitUrl)
             ->assertOk()
             ->assertSee('logged');
 
@@ -36,11 +49,21 @@ class QuestionAnswerTest extends TestCase
         $this->assertNotNull($issue->fresh()->answered_at);
     }
 
-    public function test_an_unsigned_link_is_rejected(): void
+    public function test_an_unsigned_get_is_rejected(): void
     {
         $issue = $this->question();
 
         $this->get(route('questions.answer', ['issue' => $issue->id, 'answer' => 'yes']))
+            ->assertForbidden();
+
+        $this->assertNull($issue->fresh()->answer);
+    }
+
+    public function test_an_unsigned_post_is_rejected(): void
+    {
+        $issue = $this->question();
+
+        $this->post(route('questions.answer.commit', ['issue' => $issue->id, 'answer' => 'yes']))
             ->assertForbidden();
 
         $this->assertNull($issue->fresh()->answer);
