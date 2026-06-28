@@ -8,6 +8,7 @@ use App\Enums\IssueUrgency;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Issue extends Model
 {
@@ -50,5 +51,10 @@ class Issue extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(IssueTask::class)->orderBy('position');
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable')->latest();
     }
 }

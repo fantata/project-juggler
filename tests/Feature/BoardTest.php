@@ -3,10 +3,13 @@
 namespace Tests\Feature;
 
 use App\Livewire\Board;
+use App\Models\Attachment;
 use App\Models\Issue;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -108,5 +111,61 @@ class BoardTest extends TestCase
             ->call('assignCard', $issue->id, 99999);
 
         $this->assertNull($issue->fresh()->assignee_id);
+    }
+
+    public function test_files_can_be_dropped_onto_a_card(): void
+    {
+        Storage::fake('public');
+        $this->actingAs(User::factory()->create());
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Poster', 'board_column' => 'todo']);
+
+        Livewire::test(Board::class, ['project' => $project])
+            ->call('openCard', $issue->id)
+            ->set('files', [UploadedFile::fake()->image('poster.jpg')])
+            ->assertHasNoErrors();
+
+        $attachment = $issue->fresh()->attachments()->first();
+        $this->assertNotNull($attachment);
+        $this->assertSame('poster.jpg', $attachment->original_name);
+        Storage::disk('public')->assertExists($attachment->path);
+    }
+
+    public function test_deleting_an_attachment_removes_the_file(): void
+    {
+        Storage::fake('public');
+        $this->actingAs(User::factory()->create());
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Poster', 'board_column' => 'todo']);
+
+        $component = Livewire::test(Board::class, ['project' => $project])
+            ->call('openCard', $issue->id)
+            ->set('files', [UploadedFile::fake()->create('cue.mp3', 200)]);
+
+        $attachment = $issue->fresh()->attachments()->first();
+        $path = $attachment->path;
+
+        $component->call('deleteAttachment', $attachment->id);
+
+        $this->assertSame(0, $issue->fresh()->attachments()->count());
+        Storage::disk('public')->assertMissing($path);
+    }
+
+    public function test_cannot_delete_an_attachment_from_another_project(): void
+    {
+        Storage::fake('public');
+        $this->actingAs(User::factory()->create());
+        $mine = $this->project();
+        $theirs = $this->project();
+        $otherIssue = Issue::create(['project_id' => $theirs->id, 'title' => 'Theirs', 'board_column' => 'todo']);
+        $attachment = $otherIssue->attachments()->create([
+            'disk' => 'public', 'path' => 'attachments/x/keep.jpg',
+            'original_name' => 'keep.jpg', 'mime_type' => 'image/jpeg', 'size' => 10,
+        ]);
+
+        Livewire::test(Board::class, ['project' => $mine])
+            ->call('deleteAttachment', $attachment->id);
+
+        $this->assertDatabaseHas('attachments', ['id' => $attachment->id]);
     }
 }
