@@ -24,3 +24,6 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 # Test commit
+
+# Generated Livewire assets (republished on deploy via docker/start.sh)
+/public/vendor/livewire
