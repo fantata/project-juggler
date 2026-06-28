@@ -69,6 +69,19 @@ class QuestionAnswerTest extends TestCase
         $this->assertNull($issue->fresh()->answer);
     }
 
+    public function test_an_expired_commit_link_is_rejected(): void
+    {
+        $issue = $this->question();
+        $commitUrl = URL::temporarySignedRoute('questions.answer.commit', now()->addHour(), [
+            'issue' => $issue->id, 'answer' => 'yes',
+        ]);
+
+        $this->travel(2)->hours();
+
+        $this->post($commitUrl)->assertForbidden();
+        $this->assertNull($issue->fresh()->answer);
+    }
+
     public function test_an_invalid_answer_value_is_404(): void
     {
         $issue = $this->question();

@@ -22,7 +22,9 @@ class QuestionAnswerController extends Controller
         return view('questions.confirm', [
             'issue' => $issue,
             'answer' => $answer,
-            'commitUrl' => URL::signedRoute('questions.answer.commit', [
+            // Short-lived so the commit URL can't be lifted off the page and
+            // replayed long after — you confirm within the session, not days later.
+            'commitUrl' => URL::temporarySignedRoute('questions.answer.commit', now()->addHour(), [
                 'issue' => $issue->id,
                 'answer' => $answer,
             ]),
