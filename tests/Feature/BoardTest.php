@@ -115,7 +115,7 @@ class BoardTest extends TestCase
 
     public function test_files_can_be_dropped_onto_a_card(): void
     {
-        Storage::fake('public');
+        Storage::fake('local');
         $this->actingAs(User::factory()->create());
         $project = $this->project();
         $issue = Issue::create(['project_id' => $project->id, 'title' => 'Poster', 'board_column' => 'todo']);
@@ -128,12 +128,12 @@ class BoardTest extends TestCase
         $attachment = $issue->fresh()->attachments()->first();
         $this->assertNotNull($attachment);
         $this->assertSame('poster.jpg', $attachment->original_name);
-        Storage::disk('public')->assertExists($attachment->path);
+        Storage::disk('local')->assertExists($attachment->path);
     }
 
     public function test_executable_file_types_are_rejected(): void
     {
-        Storage::fake('public');
+        Storage::fake('local');
         $this->actingAs(User::factory()->create());
         $project = $this->project();
         $issue = Issue::create(['project_id' => $project->id, 'title' => 'Poster', 'board_column' => 'todo']);
@@ -148,7 +148,7 @@ class BoardTest extends TestCase
 
     public function test_deleting_an_attachment_removes_the_file(): void
     {
-        Storage::fake('public');
+        Storage::fake('local');
         $this->actingAs(User::factory()->create());
         $project = $this->project();
         $issue = Issue::create(['project_id' => $project->id, 'title' => 'Poster', 'board_column' => 'todo']);
@@ -163,18 +163,18 @@ class BoardTest extends TestCase
         $component->call('deleteAttachment', $attachment->id);
 
         $this->assertSame(0, $issue->fresh()->attachments()->count());
-        Storage::disk('public')->assertMissing($path);
+        Storage::disk('local')->assertMissing($path);
     }
 
     public function test_cannot_delete_an_attachment_from_another_project(): void
     {
-        Storage::fake('public');
+        Storage::fake('local');
         $this->actingAs(User::factory()->create());
         $mine = $this->project();
         $theirs = $this->project();
         $otherIssue = Issue::create(['project_id' => $theirs->id, 'title' => 'Theirs', 'board_column' => 'todo']);
         $attachment = $otherIssue->attachments()->create([
-            'disk' => 'public', 'path' => 'attachments/x/keep.jpg',
+            'disk' => 'local', 'path' => 'attachments/x/keep.jpg',
             'original_name' => 'keep.jpg', 'mime_type' => 'image/jpeg', 'size' => 10,
         ]);
 
@@ -182,5 +182,52 @@ class BoardTest extends TestCase
             ->call('deleteAttachment', $attachment->id);
 
         $this->assertDatabaseHas('attachments', ['id' => $attachment->id]);
+    }
+
+    public function test_image_attachment_streams_inline_with_nosniff(): void
+    {
+        Storage::fake('local');
+        $this->actingAs(User::factory()->create());
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Poster', 'board_column' => 'todo']);
+
+        Livewire::test(Board::class, ['project' => $project])
+            ->call('openCard', $issue->id)
+            ->set('files', [UploadedFile::fake()->image('poster.jpg')]);
+
+        $this->get(route('attachments.show', $issue->fresh()->attachments()->first()))
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
+    }
+
+    public function test_non_image_attachment_is_forced_to_download(): void
+    {
+        Storage::fake('local');
+        $this->actingAs(User::factory()->create());
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Cue', 'board_column' => 'todo']);
+
+        Livewire::test(Board::class, ['project' => $project])
+            ->call('openCard', $issue->id)
+            ->set('files', [UploadedFile::fake()->create('cue.mp3', 100, 'audio/mpeg')]);
+
+        $response = $this->get(route('attachments.show', $issue->fresh()->attachments()->first()));
+
+        $response->assertOk();
+        $this->assertSame('application/octet-stream', $response->headers->get('Content-Type'));
+        $this->assertStringContainsString('attachment', (string) $response->headers->get('Content-Disposition'));
+    }
+
+    public function test_attachment_download_requires_authentication(): void
+    {
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'X', 'board_column' => 'todo']);
+        $attachment = $issue->attachments()->create([
+            'disk' => 'local', 'path' => 'attachments/x/f.jpg',
+            'original_name' => 'f.jpg', 'mime_type' => 'image/jpeg', 'size' => 10,
+        ]);
+
+        $this->get(route('attachments.show', $attachment))
+            ->assertRedirect(route('login'));
     }
 }

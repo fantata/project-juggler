@@ -105,11 +105,13 @@ class Board extends Component
         $issue = $this->project->issues()->findOrFail($this->openCardId);
 
         foreach ($this->files as $file) {
-            $path = $file->store("attachments/{$issue->id}", 'public');
+            // Private disk — never web-served directly. Reached only through the
+            // auth-gated AttachmentController, which sets safe response headers.
+            $path = $file->store("attachments/{$issue->id}", 'local');
 
             $issue->attachments()->create([
                 'user_id' => auth()->id(),
-                'disk' => 'public',
+                'disk' => 'local',
                 'path' => $path,
                 'original_name' => $file->getClientOriginalName(),
                 'mime_type' => $file->getMimeType(),

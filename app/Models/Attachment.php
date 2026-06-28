@@ -46,7 +46,7 @@ class Attachment extends Model
 
     public function url(): string
     {
-        return Storage::disk($this->disk)->url($this->path);
+        return route('attachments.show', $this);
     }
 
     public function isImage(): bool
