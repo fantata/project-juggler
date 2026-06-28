@@ -1,7 +1,11 @@
 <x-mail::message>
 # Morning, {{ str($user->name)->before(' ') }} 👋
 
+@if ($summary)
+_{{ $summary }}_
+@else
 Here's what's looking at you on the boards.
+@endif
 
 @if ($awaitingYou->isNotEmpty())
 ## Waiting on your yes/no

@@ -7,6 +7,7 @@ use App\Models\Issue;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
@@ -69,6 +70,29 @@ class SendMorningSweepTest extends TestCase
         $this->artisan('sweep:send --dry-run')->assertSuccessful();
 
         Mail::assertNothingSent();
+    }
+
+    public function test_it_adds_an_ai_summary_when_a_key_is_present(): void
+    {
+        // env() reads $_ENV/$_SERVER (not putenv) in Laravel by default.
+        $_ENV['ANTHROPIC_API_KEY'] = $_SERVER['ANTHROPIC_API_KEY'] = 'test-key';
+        Http::fake([
+            'api.anthropic.com/*' => Http::response(['content' => [['text' => 'Two things want you today.']]], 200),
+        ]);
+        Mail::fake();
+        $danny = User::factory()->create();
+        Issue::create([
+            'project_id' => $this->project()->id, 'title' => 'q',
+            'is_question' => true, 'assignee_id' => $danny->id,
+        ]);
+
+        try {
+            $this->artisan('sweep:send')->assertSuccessful();
+
+            Mail::assertSent(MorningSweep::class, fn ($mail) => $mail->summary === 'Two things want you today.');
+        } finally {
+            unset($_ENV['ANTHROPIC_API_KEY'], $_SERVER['ANTHROPIC_API_KEY']);
+        }
     }
 
     public function test_a_pending_question_is_not_double_listed_as_assigned(): void

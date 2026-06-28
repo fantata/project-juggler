@@ -18,6 +18,7 @@ class MorningSweep extends Mailable
         public User $user,
         public Collection $awaitingYou,
         public Collection $assigned,
+        public ?string $summary = null,
     ) {}
 
     public function envelope(): Envelope
