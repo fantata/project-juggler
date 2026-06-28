@@ -344,4 +344,10 @@
             </div>
         </div>
     </div>
+
+    {{-- Project discussion — a chat room scoped to this project --}}
+    <div class="mt-6">
+        <h3 class="text-base font-semibold text-bark-800 dark:text-cream-200 mb-3">Discussion</h3>
+        <livewire:messenger :project-id="$project->id" :key="'project-chat-'.$project->id" />
+    </div>
 </div>

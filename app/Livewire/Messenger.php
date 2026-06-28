@@ -15,12 +15,20 @@ class Messenger extends Component
     /** The message currently being replied to, if any. */
     public ?int $replyingTo = null;
 
+    /** Which room: null = the shared Together room, otherwise a project thread. */
+    public ?int $projectId = null;
+
     /** The reaction palette — a little Dogface theatre tucked in there. */
     public const EMOJIS = ['👍', '❤️', '😂', '🎭', '🙌', '🔥'];
 
+    public function mount(?int $projectId = null): void
+    {
+        $this->projectId = $projectId;
+    }
+
     public function startReply(int $messageId): void
     {
-        $this->replyingTo = Message::whereKey($messageId)->value('id');
+        $this->replyingTo = $this->roomMessages()->whereKey($messageId)->value('id');
     }
 
     public function cancelReply(): void
@@ -34,6 +42,7 @@ class Messenger extends Component
 
         Message::create([
             'sender_id' => Auth::id(),
+            'project_id' => $this->projectId,
             'parent_id' => $this->replyingTo,
             'body' => trim($this->body),
         ]);
@@ -44,7 +53,7 @@ class Messenger extends Component
 
     /**
      * Toggle the current user's reaction. One of each emoji per person, so a
-     * second tap removes it.
+     * second tap removes it. Scoped to this room's messages.
      */
     public function react(int $messageId, string $emoji): void
     {
@@ -52,7 +61,11 @@ class Messenger extends Component
             return;
         }
 
-        $message = Message::findOrFail($messageId);
+        $message = $this->roomMessages()->whereKey($messageId)->first();
+
+        if ($message === null) {
+            return;
+        }
 
         $existing = $message->reactions()
             ->where('user_id', Auth::id())
@@ -71,10 +84,21 @@ class Messenger extends Component
         ]);
     }
 
+    /** Base query for the current room (the shared room or a project thread). */
+    private function roomMessages()
+    {
+        return Message::query()->when(
+            $this->projectId === null,
+            fn ($query) => $query->whereNull('project_id'),
+            fn ($query) => $query->where('project_id', $this->projectId),
+        );
+    }
+
     public function render()
     {
         return view('livewire.messenger', [
-            'messages' => Message::with(['sender', 'parent.sender', 'reactions'])
+            'messages' => $this->roomMessages()
+                ->with(['sender', 'parent.sender', 'reactions'])
                 ->orderBy('created_at')
                 ->get(),
             'emojis' => self::EMOJIS,

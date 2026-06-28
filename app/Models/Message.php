@@ -11,6 +11,7 @@ class Message extends Model
 {
     protected $fillable = [
         'sender_id',
+        'project_id',
         'parent_id',
         'body',
     ];
@@ -18,6 +19,11 @@ class Message extends Model
     public function sender(): BelongsTo
     {
         return $this->belongsTo(User::class, 'sender_id');
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
     }
 
     public function parent(): BelongsTo
