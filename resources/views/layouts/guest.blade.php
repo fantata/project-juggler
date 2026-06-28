@@ -14,13 +14,17 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
-        {{-- Seed the theme before paint to avoid a flash: saved choice, else OS. --}}
+        {{-- Seed the theme before paint, and re-apply after every Livewire
+             navigation (wire:navigate morphs <html> and would strip the class). --}}
         <script>
             (function () {
-                const t = localStorage.getItem('theme');
-                if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                    document.documentElement.classList.add('dark');
-                }
+                const applyTheme = function () {
+                    const t = localStorage.getItem('theme');
+                    const dark = t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                    document.documentElement.classList.toggle('dark', dark);
+                };
+                applyTheme();
+                document.addEventListener('livewire:navigated', applyTheme);
             })();
         </script>
 

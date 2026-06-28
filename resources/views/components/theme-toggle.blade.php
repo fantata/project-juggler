@@ -3,7 +3,7 @@
 {{-- Manual light/dark toggle. Persists the choice; the layout's early script
      seeds the class from this (or the OS) before paint. --}}
 <button type="button"
-    x-data="{ dark: document.documentElement.classList.contains('dark') }"
+    x-data="{ dark: localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches }"
     @click="dark = !dark; document.documentElement.classList.toggle('dark', dark); localStorage.setItem('theme', dark ? 'dark' : 'light')"
     x-bind:aria-pressed="dark.toString()"
     aria-label="Toggle dark mode"
