@@ -14,17 +14,20 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
-        {{-- Seed the theme before paint, and re-apply after every Livewire
-             navigation (wire:navigate morphs <html> and would strip the class). --}}
+        {{-- Theme: seed before paint, then re-assert if the class is stripped
+             (wire:navigate morphs <html> to server markup with no dark class). --}}
         <script>
             (function () {
-                const applyTheme = function () {
+                const root = document.documentElement;
+                const wantDark = function () {
                     const t = localStorage.getItem('theme');
-                    const dark = t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
-                    document.documentElement.classList.toggle('dark', dark);
+                    return t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
                 };
-                applyTheme();
-                document.addEventListener('livewire:navigated', applyTheme);
+                const apply = function () { root.classList.toggle('dark', wantDark()); };
+                apply();
+                new MutationObserver(function () {
+                    if (root.classList.contains('dark') !== wantDark()) apply();
+                }).observe(root, { attributes: true, attributeFilter: ['class'] });
             })();
         </script>
 

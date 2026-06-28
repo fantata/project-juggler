@@ -14,18 +14,22 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=atkinson-hyperlegible-next:400,500,600,700&display=swap" rel="stylesheet" />
 
-        {{-- Seed the theme before paint, and re-apply after every Livewire
-             navigation — wire:navigate morphs <html> to the server markup, which
-             has no dark class, so we'd otherwise lose it on each page change. --}}
+        {{-- Theme: seed before paint, then re-assert whenever the class is
+             stripped. wire:navigate morphs <html> to server markup (no dark
+             class); on some pages (e.g. the @script calendar) livewire:navigated
+             isn't reliable, so we watch <html> directly and put it back. --}}
         <script>
             (function () {
-                const applyTheme = function () {
+                const root = document.documentElement;
+                const wantDark = function () {
                     const t = localStorage.getItem('theme');
-                    const dark = t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
-                    document.documentElement.classList.toggle('dark', dark);
+                    return t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
                 };
-                applyTheme();
-                document.addEventListener('livewire:navigated', applyTheme);
+                const apply = function () { root.classList.toggle('dark', wantDark()); };
+                apply();
+                new MutationObserver(function () {
+                    if (root.classList.contains('dark') !== wantDark()) apply();
+                }).observe(root, { attributes: true, attributeFilter: ['class'] });
             })();
         </script>
 
