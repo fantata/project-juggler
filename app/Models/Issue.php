@@ -24,6 +24,8 @@ class Issue extends Model
         'urgency',
         'due_bucket',
         'is_question',
+        'answer',
+        'answered_at',
         'github_issue_number',
     ];
 
@@ -34,6 +36,7 @@ class Issue extends Model
             'urgency' => IssueUrgency::class,
             'due_bucket' => DueBucket::class,
             'is_question' => 'boolean',
+            'answered_at' => 'datetime',
             'position' => 'integer',
         ];
     }

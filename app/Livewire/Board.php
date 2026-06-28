@@ -2,10 +2,12 @@
 
 namespace App\Livewire;
 
+use App\Mail\QuestionAsked;
 use App\Models\Attachment;
 use App\Models\Issue;
 use App\Models\Project;
 use App\Models\User;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -20,6 +22,9 @@ class Board extends Component
 
     /** Pending uploads bound to the dropzone on the open card. */
     public array $files = [];
+
+    /** Transient confirmation shown in the open card (e.g. after asking). */
+    public ?string $flash = null;
 
     /**
      * Fixed kanban columns for v1: key => label. Customisable columns can come
@@ -72,12 +77,39 @@ class Board extends Component
         // Only open cards that belong to this project.
         $this->openCardId = $this->project->issues()->whereKey($issueId)->value('id');
         $this->files = [];
+        $this->flash = null;
     }
 
     public function closeCard(): void
     {
         $this->openCardId = null;
         $this->files = [];
+        $this->flash = null;
+    }
+
+    /**
+     * Email the assignee a yes/no question with one-click signed answer links.
+     * Needs a question card with someone to ask.
+     */
+    public function askQuestion(int $issueId): void
+    {
+        $issue = $this->project->issues()->with('assignee')->findOrFail($issueId);
+
+        if (! $issue->is_question || $issue->assignee === null) {
+            return;
+        }
+
+        Mail::to($issue->assignee->email)->send(new QuestionAsked($issue));
+
+        $this->flash = "Asked {$issue->assignee->name} — they'll get an email with one-click yes/no.";
+    }
+
+    /** Flip a card to/from a yes/no question. */
+    public function toggleQuestion(int $issueId): void
+    {
+        $issue = $this->project->issues()->findOrFail($issueId);
+        $issue->update(['is_question' => ! $issue->is_question]);
+        $this->flash = null;
     }
 
     /**

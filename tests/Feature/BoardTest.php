@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Livewire\Board;
+use App\Mail\QuestionAsked;
 use App\Models\Attachment;
 use App\Models\Issue;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -229,5 +231,59 @@ class BoardTest extends TestCase
 
         $this->get(route('attachments.show', $attachment))
             ->assertRedirect(route('login'));
+    }
+
+    public function test_asking_a_question_emails_the_assignee(): void
+    {
+        Mail::fake();
+        $this->actingAs(User::factory()->create());
+        $danny = User::factory()->create(['name' => 'Danny', 'email' => 'danny@example.com']);
+        $project = $this->project();
+        $issue = Issue::create([
+            'project_id' => $project->id, 'title' => 'Book the 2pm slot?',
+            'board_column' => 'todo', 'is_question' => true, 'assignee_id' => $danny->id,
+        ]);
+
+        Livewire::test(Board::class, ['project' => $project])
+            ->call('openCard', $issue->id)
+            ->call('askQuestion', $issue->id);
+
+        Mail::assertSent(QuestionAsked::class, fn ($mail) => $mail->hasTo('danny@example.com'));
+    }
+
+    public function test_asking_without_an_assignee_sends_nothing(): void
+    {
+        Mail::fake();
+        $this->actingAs(User::factory()->create());
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Q', 'is_question' => true]);
+
+        Livewire::test(Board::class, ['project' => $project])->call('askQuestion', $issue->id);
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_asking_a_non_question_sends_nothing(): void
+    {
+        Mail::fake();
+        $this->actingAs(User::factory()->create());
+        $danny = User::factory()->create();
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Not a question', 'assignee_id' => $danny->id]);
+
+        Livewire::test(Board::class, ['project' => $project])->call('askQuestion', $issue->id);
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_a_card_can_be_toggled_into_a_question(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'X', 'board_column' => 'todo']);
+
+        Livewire::test(Board::class, ['project' => $project])->call('toggleQuestion', $issue->id);
+
+        $this->assertTrue($issue->fresh()->is_question);
     }
 }

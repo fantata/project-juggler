@@ -3,6 +3,7 @@
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\IcsController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\QuestionAnswerController;
 use App\Livewire\Board;
 use App\Livewire\Calendar;
 use App\Livewire\Dashboard;
@@ -35,5 +36,11 @@ Route::middleware(['auth'])->group(function () {
 
 // ICS feed (public, authenticated by unique token in URL)
 Route::get('/ics/{token}.ics', IcsController::class)->name('ics.feed');
+
+// One-click yes/no answer from the emailed link. No login — the signed URL is
+// the auth (the signature ties it to this issue + answer).
+Route::get('/questions/{issue}/answer/{answer}', QuestionAnswerController::class)
+    ->name('questions.answer')
+    ->middleware('signed');
 
 require __DIR__.'/auth.php';

@@ -159,6 +159,48 @@
                         <p class="text-sm text-bark-700 dark:text-gray-300 whitespace-pre-line">{{ $openCard->description }}</p>
                     @endif
 
+                    @if ($flash)
+                        <div class="rounded-lg px-3 py-2 text-sm bg-moss-50 dark:bg-moss-900/20 border border-moss-200 dark:border-moss-700 text-moss-700 dark:text-moss-300">
+                            {{ $flash }}
+                        </div>
+                    @endif
+
+                    {{-- Yes/No request loop --}}
+                    @if ($openCard->is_question)
+                        <div class="rounded-xl border border-cream-200 dark:border-gray-700 p-3">
+                            <div class="flex items-center justify-between gap-2 mb-1.5">
+                                <span class="text-xs px-2 py-0.5 rounded-full bg-terracotta-50 dark:bg-terracotta-900/30 text-terracotta-700 dark:text-terracotta-300">Yes / No question</span>
+                                <button type="button" wire:click="toggleQuestion({{ $openCard->id }})" class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">Not a question</button>
+                            </div>
+
+                            @if ($openCard->answer)
+                                <p class="text-sm text-bark-700 dark:text-gray-300">
+                                    Answered
+                                    <span class="font-semibold {{ $openCard->answer === 'yes' ? 'text-moss-600 dark:text-moss-400' : 'text-terracotta-600 dark:text-terracotta-400' }}">{{ ucfirst($openCard->answer) }}</span>
+                                    @if ($openCard->answered_at)<span class="text-gray-400 dark:text-gray-500"> &middot; {{ $openCard->answered_at->diffForHumans() }}</span>@endif
+                                </p>
+                                <button type="button" wire:click="askQuestion({{ $openCard->id }})" @disabled(! $openCard->assignee)
+                                        class="mt-2 text-sm text-gray-500 dark:text-gray-400 hover:text-terracotta-600 dark:hover:text-terracotta-400 disabled:opacity-40">
+                                    Ask again
+                                </button>
+                            @elseif ($openCard->assignee)
+                                <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">Email {{ $openCard->assignee->name }} a one-click yes/no.</p>
+                                <button type="button" wire:click="askQuestion({{ $openCard->id }})"
+                                        class="inline-flex items-center gap-1.5 rounded-lg bg-terracotta-500 text-white text-sm font-medium px-3 py-1.5 hover:bg-terracotta-600">
+                                    Ask {{ $openCard->assignee->name }}
+                                </button>
+                            @else
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Assign someone above, then ask them.</p>
+                            @endif
+                        </div>
+                    @else
+                        <button type="button" wire:click="toggleQuestion({{ $openCard->id }})"
+                                class="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-terracotta-600 dark:hover:text-terracotta-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"/></svg>
+                            Make this a yes/no question
+                        </button>
+                    @endif
+
                     <div>
                         <h4 class="text-sm font-semibold text-bark-700 dark:text-cream-200 mb-2">Files</h4>
 
