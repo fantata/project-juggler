@@ -6,14 +6,14 @@
          x-init="toBottom()"
          @message-posted.window="toBottom()"
          class="flex-1 min-h-0 flex flex-col">
-        <div x-ref="scroll" class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+        <div x-ref="scroll" role="log" aria-live="polite" class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
             @forelse($messages as $message)
                 @php $isOwn = $message->sender_id === auth()->id(); @endphp
                 <div wire:key="msg-{{ $message->id }}" class="flex {{ $isOwn ? 'justify-end' : 'justify-start' }}">
                     <div class="max-w-[80%] group">
                         {{-- Reply context: the message this one answers --}}
                         @if ($message->parent)
-                            <div class="flex items-center gap-1 mb-0.5 px-2 text-sm text-gray-400 dark:text-gray-500 {{ $isOwn ? 'justify-end' : '' }}">
+                            <div class="flex items-center gap-1 mb-0.5 px-2 text-sm text-gray-500 dark:text-gray-400 {{ $isOwn ? 'justify-end' : '' }}">
                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"/></svg>
                                 <span class="truncate max-w-[12rem]">{{ $message->parent->sender->name }}: {{ str($message->parent->body)->limit(40) }}</span>
                             </div>
@@ -22,7 +22,7 @@
                         <div class="flex items-end gap-1.5 {{ $isOwn ? 'flex-row-reverse' : '' }}">
                             <div @class([
                                 'rounded-2xl px-4 py-2.5',
-                                'bg-terracotta-500 text-white rounded-br-md' => $isOwn,
+                                'bg-terracotta-600 text-white rounded-br-md' => $isOwn,
                                 'bg-cream-100 dark:bg-gray-700 text-bark-800 dark:text-cream-100 rounded-bl-md' => ! $isOwn,
                             ])>
                                 <p class="text-base leading-relaxed whitespace-pre-wrap break-words">{{ $message->body }}</p>
@@ -41,7 +41,8 @@
                                          class="absolute z-20 bottom-full mb-1 flex gap-1 p-1.5 rounded-full bg-white dark:bg-gray-800 border border-cream-200 dark:border-gray-700 shadow-lg {{ $isOwn ? 'right-0' : 'left-0' }}">
                                         @foreach ($emojis as $emoji)
                                             <button type="button" @click="pick = false" wire:click="react({{ $message->id }}, '{{ $emoji }}')"
-                                                    class="text-xl leading-none hover:scale-125 transition-transform">{{ $emoji }}</button>
+                                                    aria-label="React {{ $emoji }}"
+                                                    class="text-xl leading-none motion-safe:hover:scale-125 transition-transform">{{ $emoji }}</button>
                                         @endforeach
                                     </div>
                                 </div>
@@ -59,6 +60,8 @@
                                 @foreach ($message->reactions->groupBy('emoji') as $emoji => $reacts)
                                     @php $mine = $reacts->contains('user_id', auth()->id()); @endphp
                                     <button type="button" wire:click="react({{ $message->id }}, '{{ $emoji }}')"
+                                            aria-pressed="{{ $mine ? 'true' : 'false' }}"
+                                            aria-label="{{ $emoji }} reaction, {{ $reacts->count() }}{{ $mine ? ', you reacted' : '' }}"
                                             @class([
                                                 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm border transition',
                                                 'bg-terracotta-50 dark:bg-terracotta-900/30 border-terracotta-300 dark:border-terracotta-700 text-terracotta-700 dark:text-terracotta-300' => $mine,
@@ -71,7 +74,7 @@
                             </div>
                         @endif
 
-                        <p class="mt-1 px-1 text-sm text-gray-400 dark:text-gray-500 {{ $isOwn ? 'text-right' : 'text-left' }}">
+                        <p class="mt-1 px-1 text-sm text-gray-500 dark:text-gray-400 {{ $isOwn ? 'text-right' : 'text-left' }}">
                             {{ $isOwn ? 'You' : $message->sender->name }} &middot; {{ $message->created_at->diffForHumans() }}
                         </p>
                     </div>
@@ -91,7 +94,7 @@
             <div class="shrink-0 flex items-center justify-between gap-2 px-4 py-2 bg-cream-100 dark:bg-gray-700/60 border-t border-cream-200 dark:border-gray-700">
                 <span class="truncate text-sm text-bark-600 dark:text-gray-300">
                     <span class="font-medium">Replying to {{ $replyTarget->sender_id === auth()->id() ? 'yourself' : $replyTarget->sender->name }}</span>
-                    <span class="text-gray-400 dark:text-gray-500">— {{ str($replyTarget->body)->limit(50) }}</span>
+                    <span class="text-gray-500 dark:text-gray-400">— {{ str($replyTarget->body)->limit(50) }}</span>
                 </span>
                 <button type="button" wire:click="cancelReply" class="shrink-0 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" aria-label="Cancel reply">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -112,7 +115,7 @@
             @error('body') <span class="text-red-600 dark:text-red-400 text-sm">{{ $message }}</span> @enderror
         </div>
         <button type="submit"
-            class="shrink-0 inline-flex items-center justify-center w-12 h-12 rounded-xl bg-terracotta-500 text-white hover:bg-terracotta-600 focus:outline-none focus:ring-2 focus:ring-terracotta-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+            class="shrink-0 inline-flex items-center justify-center w-12 h-12 rounded-xl bg-terracotta-600 text-white hover:bg-terracotta-700 focus:outline-none focus:ring-2 focus:ring-terracotta-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
             aria-label="Send message">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />

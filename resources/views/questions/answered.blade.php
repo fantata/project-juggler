@@ -8,6 +8,6 @@
             to:
         </p>
         <p class="mt-1 text-bark-700 dark:text-cream-100">&ldquo;{{ $issue->title }}&rdquo;</p>
-        <p class="mt-5 text-sm text-gray-400 dark:text-gray-500">You can close this tab — they'll see it in Juggler.</p>
+        <p class="mt-5 text-sm text-gray-500 dark:text-gray-400">You can close this tab — they'll see it in Juggler.</p>
     </div>
 </x-guest-layout>

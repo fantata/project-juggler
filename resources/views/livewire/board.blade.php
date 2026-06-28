@@ -22,7 +22,7 @@
             <section wire:key="col-{{ $key }}" class="snap-start shrink-0 w-[82vw] sm:w-72 lg:w-80 flex flex-col">
                 <div class="flex items-center justify-between px-1 mb-2">
                     <h3 class="text-sm font-semibold text-bark-700 dark:text-cream-200">{{ $label }}</h3>
-                    <span class="text-sm text-gray-400 dark:text-gray-500">{{ $columnCards->count() }}</span>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ $columnCards->count() }}</span>
                 </div>
 
                 {{-- Desktop drag-and-drop (SortableJS); mobile uses the move buttons below --}}
@@ -31,7 +31,7 @@
                      x-data
                      x-init="window.Sortable && window.Sortable.create($el, {
                         group: 'board',
-                        animation: 150,
+                        animation: window.boardSortAnimation ?? 150,
                         draggable: '[data-id]',
                         ghostClass: 'opacity-30',
                         onEnd(evt) {
@@ -49,7 +49,7 @@
 
                             <div class="flex items-center gap-2 mt-2 flex-wrap">
                                 @if ($card->attachments_count > 0)
-                                    <span class="inline-flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500" title="{{ $card->attachments_count }} file(s)">
+                                    <span class="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400" title="{{ $card->attachments_count }} file(s)">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"/></svg>
                                         {{ $card->attachments_count }}
                                     </span>
@@ -62,13 +62,13 @@
                                 @endif
 
                                 @if ($card->tasks_count > 0)
-                                    <span class="text-xs text-gray-400 dark:text-gray-500">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">
                                         {{ $card->completed_tasks_count }}/{{ $card->tasks_count }}
                                     </span>
                                 @endif
 
                                 @if ($card->urgency->value === 'high')
-                                    <span class="text-xs font-medium text-red-500 dark:text-red-400">High</span>
+                                    <span class="text-xs font-medium text-red-600 dark:text-red-400">High</span>
                                 @endif
 
                                 <span class="flex-1"></span>
@@ -76,14 +76,15 @@
                                 {{-- Assignee picker: tap the chip to assign a person --}}
                                 <div x-data="{ open: false }" class="relative">
                                     <button type="button" @click="open = !open"
-                                            title="{{ $card->assignee?->name ?? 'Assign' }}"
+                                            x-bind:aria-expanded="open"
+                                            aria-label="{{ $card->assignee ? 'Reassign card, currently '.$card->assignee->name : 'Assign card' }}"
                                             class="block rounded-full focus:outline-none focus:ring-2 focus:ring-terracotta-400">
                                         @if ($card->assignee)
-                                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-moss-500 text-white text-xs font-semibold">
+                                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-moss-600 text-white text-xs font-semibold">
                                                 {{ $card->assignee->initials }}
                                             </span>
                                         @else
-                                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full border border-dashed border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 text-xs">+</span>
+                                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 text-xs">+</span>
                                         @endif
                                     </button>
 
@@ -95,7 +96,7 @@
                                             <button type="button" @click="open = false"
                                                     wire:click="assignCard({{ $card->id }}, {{ $u->id }})"
                                                     class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-bark-700 dark:text-cream-200 hover:bg-cream-100 dark:hover:bg-gray-700">
-                                                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-moss-500 text-white text-xs font-semibold shrink-0">{{ $u->initials }}</span>
+                                                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-moss-600 text-white text-xs font-semibold shrink-0">{{ $u->initials }}</span>
                                                 <span class="flex-1 truncate">{{ $u->name }}</span>
                                                 @if ($card->assignee_id === $u->id)
                                                     <svg class="w-4 h-4 text-moss-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -131,7 +132,7 @@
                             </div>
                         </article>
                     @empty
-                        <p class="text-xs text-center text-gray-400 dark:text-gray-500 py-4">Nothing here yet</p>
+                        <p class="text-xs text-center text-gray-500 dark:text-gray-400 py-4">Nothing here yet</p>
                     @endforelse
                 </div>
             </section>
@@ -141,14 +142,16 @@
     {{-- Card detail: a bottom sheet on mobile, a centred dialog on desktop --}}
     @if ($openCard)
         <div class="fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4"
-             x-data x-on:keydown.escape.window="$wire.closeCard()">
-            <div class="absolute inset-0 bg-gray-900/50" wire:click="closeCard"></div>
+             x-data x-trap.inert.noscroll="true"
+             role="dialog" aria-modal="true" aria-labelledby="card-title-{{ $openCard->id }}"
+             x-on:keydown.escape.window="$wire.closeCard()">
+            <div class="absolute inset-0 bg-gray-900/50" wire:click="closeCard" aria-hidden="true"></div>
 
             <div class="relative w-full sm:max-w-lg max-h-[92vh] overflow-y-auto
                         bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl shadow-xl">
                 <div class="sticky top-0 z-10 bg-white dark:bg-gray-800 px-5 py-4 border-b border-cream-200 dark:border-gray-700 flex items-start justify-between gap-3">
-                    <h3 class="text-lg font-semibold text-bark-800 dark:text-cream-200">{{ $openCard->title }}</h3>
-                    <button type="button" wire:click="closeCard" class="-m-1 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <h3 id="card-title-{{ $openCard->id }}" class="text-lg font-semibold text-bark-800 dark:text-cream-200">{{ $openCard->title }}</h3>
+                    <button type="button" wire:click="closeCard" aria-label="Close" class="-m-1 p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -160,11 +163,11 @@
                         @endif
                         @if ($openCard->assignee)
                             <span class="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
-                                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-moss-500 text-white text-xs font-semibold">{{ $openCard->assignee->initials }}</span>
+                                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-moss-600 text-white text-xs font-semibold">{{ $openCard->assignee->initials }}</span>
                                 {{ $openCard->assignee->name }}
                             </span>
                         @else
-                            <span class="text-gray-400 dark:text-gray-500">Unassigned</span>
+                            <span class="text-gray-500 dark:text-gray-400">Unassigned</span>
                         @endif
                     </div>
 
@@ -173,7 +176,7 @@
                     @endif
 
                     @if ($flash)
-                        <div class="rounded-lg px-3 py-2 text-sm bg-moss-50 dark:bg-moss-900/20 border border-moss-200 dark:border-moss-700 text-moss-700 dark:text-moss-300">
+                        <div role="status" class="rounded-lg px-3 py-2 text-sm bg-moss-50 dark:bg-moss-900/20 border border-moss-200 dark:border-moss-700 text-moss-700 dark:text-moss-300">
                             {{ $flash }}
                         </div>
                     @endif
@@ -190,7 +193,7 @@
                                 <p class="text-sm text-bark-700 dark:text-gray-300">
                                     Answered
                                     <span class="font-semibold {{ $openCard->answer === 'yes' ? 'text-moss-600 dark:text-moss-400' : 'text-terracotta-600 dark:text-terracotta-400' }}">{{ ucfirst($openCard->answer) }}</span>
-                                    @if ($openCard->answered_at)<span class="text-gray-400 dark:text-gray-500"> &middot; {{ $openCard->answered_at->diffForHumans() }}</span>@endif
+                                    @if ($openCard->answered_at)<span class="text-gray-500 dark:text-gray-400"> &middot; {{ $openCard->answered_at->diffForHumans() }}</span>@endif
                                 </p>
                                 <button type="button" wire:click="askQuestion({{ $openCard->id }})" @disabled(! $openCard->assignee)
                                         class="mt-2 text-sm text-gray-500 dark:text-gray-400 hover:text-terracotta-600 dark:hover:text-terracotta-400 disabled:opacity-40">
@@ -199,7 +202,7 @@
                             @elseif ($openCard->assignee)
                                 <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">Email {{ $openCard->assignee->name }} a one-click yes/no.</p>
                                 <button type="button" wire:click="askQuestion({{ $openCard->id }})"
-                                        class="inline-flex items-center gap-1.5 rounded-lg bg-terracotta-500 text-white text-sm font-medium px-3 py-1.5 hover:bg-terracotta-600">
+                                        class="inline-flex items-center gap-1.5 rounded-lg bg-terracotta-600 text-white text-sm font-medium px-3 py-1.5 hover:bg-terracotta-700">
                                     Ask {{ $openCard->assignee->name }}
                                 </button>
                             @else
@@ -231,8 +234,8 @@
                                                 <span class="text-xs text-bark-700 dark:text-gray-300 truncate w-full mt-1">{{ $att->original_name }}</span>
                                             </a>
                                         @endif
-                                        <button type="button" wire:click="deleteAttachment({{ $att->id }})" wire:confirm="Remove this file?"
-                                                class="absolute top-1 right-1 rounded-full p-1 bg-white/90 dark:bg-gray-800/90 text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition">
+                                        <button type="button" wire:click="deleteAttachment({{ $att->id }})" wire:confirm="Remove this file?" aria-label="Remove {{ $att->original_name }}"
+                                                class="absolute top-1 right-1 rounded-full p-1 bg-white/90 dark:bg-gray-800/90 text-red-600 dark:text-red-400 opacity-0 group-hover:opacity-100 focus:opacity-100 transition">
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </button>
                                         <div class="px-1.5 py-1 text-xs text-gray-500 dark:text-gray-400 truncate">{{ $att->humanSize() }}</div>
@@ -247,14 +250,14 @@
                                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
                             <div class="pointer-events-none">
                                 <p class="text-sm text-bark-600 dark:text-gray-300">Drop files here, or tap to add</p>
-                                <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Posters, audio, PDFs — up to 25 MB each</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Posters, audio, PDFs — up to 25 MB each</p>
                             </div>
-                            <div wire:loading wire:target="files,updatedFiles" class="absolute inset-0 flex items-center justify-center rounded-xl bg-white/80 dark:bg-gray-800/80 text-sm text-bark-600 dark:text-cream-200">
+                            <div wire:loading wire:target="files,updatedFiles" role="status" class="absolute inset-0 flex items-center justify-center rounded-xl bg-white/80 dark:bg-gray-800/80 text-sm text-bark-600 dark:text-cream-200">
                                 Uploading…
                             </div>
                         </div>
-                        @error('files') <p class="text-sm text-red-500 mt-1">{{ $message }}</p> @enderror
-                        @error('files.*') <p class="text-sm text-red-500 mt-1">{{ $message }}</p> @enderror
+                        @error('files') <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p> @enderror
+                        @error('files.*') <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p> @enderror
                     </div>
 
                     {{-- Discussion --}}
@@ -271,7 +274,7 @@
                                 @endforeach
                             </div>
                         @empty
-                            <p class="text-sm text-gray-400 dark:text-gray-500 mb-3">No comments yet — start the thread.</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">No comments yet — start the thread.</p>
                         @endforelse
 
                         @if ($replyToComment)
@@ -288,9 +291,9 @@
                             <textarea wire:model="commentBody" id="comment-body" rows="1"
                                 placeholder="{{ $replyToComment ? 'Write a reply…' : 'Add a comment…' }}"
                                 class="flex-1 resize-none rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 shadow-sm focus:border-terracotta-400 focus:ring-terracotta-400 text-sm"></textarea>
-                            <button type="submit" class="shrink-0 rounded-xl bg-terracotta-500 text-white px-4 py-2 text-sm font-medium hover:bg-terracotta-600">Post</button>
+                            <button type="submit" class="shrink-0 rounded-xl bg-terracotta-600 text-white px-4 py-2 text-sm font-medium hover:bg-terracotta-700">Post</button>
                         </form>
-                        @error('commentBody') <p class="text-sm text-red-500 mt-1">{{ $message }}</p> @enderror
+                        @error('commentBody') <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p> @enderror
                     </div>
                 </div>
             </div>
