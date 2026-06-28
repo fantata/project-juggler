@@ -19,15 +19,28 @@
             @php($keys = array_keys($columns))
             @php($index = array_search($key, $keys))
 
-            <section class="snap-start shrink-0 w-[82vw] sm:w-72 lg:w-80 flex flex-col">
+            <section wire:key="col-{{ $key }}" class="snap-start shrink-0 w-[82vw] sm:w-72 lg:w-80 flex flex-col">
                 <div class="flex items-center justify-between px-1 mb-2">
                     <h3 class="text-sm font-semibold text-bark-700 dark:text-cream-200">{{ $label }}</h3>
                     <span class="text-sm text-gray-400 dark:text-gray-500">{{ $columnCards->count() }}</span>
                 </div>
 
-                <div class="flex-1 space-y-2 rounded-xl bg-cream-100 dark:bg-gray-900/40 p-2 min-h-[6rem]">
+                {{-- Desktop drag-and-drop (SortableJS); mobile uses the move buttons below --}}
+                <div class="flex-1 space-y-2 rounded-xl bg-cream-100 dark:bg-gray-900/40 p-2 min-h-[6rem]"
+                     data-column="{{ $key }}"
+                     x-data
+                     x-init="window.Sortable && window.Sortable.create($el, {
+                        group: 'board',
+                        animation: 150,
+                        draggable: '[data-id]',
+                        ghostClass: 'opacity-30',
+                        onEnd(evt) {
+                            const ids = Array.from(evt.to.querySelectorAll('[data-id]')).map(el => el.dataset.id);
+                            $wire.moveCardTo(Number(evt.item.dataset.id), evt.to.dataset.column, ids);
+                        },
+                     })">
                     @forelse ($columnCards as $card)
-                        <article wire:key="card-{{ $card->id }}"
+                        <article wire:key="card-{{ $card->id }}" data-id="{{ $card->id }}"
                                  class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-cream-200 dark:border-gray-700 p-3">
                             <button type="button" wire:click="openCard({{ $card->id }})"
                                     class="block w-full text-left text-sm font-medium text-bark-800 dark:text-cream-200 hover:text-terracotta-600 dark:hover:text-terracotta-400">

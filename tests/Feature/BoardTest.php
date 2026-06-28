@@ -75,6 +75,36 @@ class BoardTest extends TestCase
         $this->assertSame('doing', $issue->fresh()->board_column);
     }
 
+    public function test_move_card_to_sets_column_and_persists_order(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $project = $this->project();
+        $a = Issue::create(['project_id' => $project->id, 'title' => 'A', 'board_column' => 'todo']);
+        $b = Issue::create(['project_id' => $project->id, 'title' => 'B', 'board_column' => 'doing']);
+        $c = Issue::create(['project_id' => $project->id, 'title' => 'C', 'board_column' => 'doing']);
+
+        // Drag A into 'doing', dropped between C and B: order [c, a, b]
+        Livewire::test(Board::class, ['project' => $project])
+            ->call('moveCardTo', $a->id, 'doing', [$c->id, $a->id, $b->id]);
+
+        $this->assertSame('doing', $a->fresh()->board_column);
+        $this->assertSame(0, $c->fresh()->position);
+        $this->assertSame(1, $a->fresh()->position);
+        $this->assertSame(2, $b->fresh()->position);
+    }
+
+    public function test_move_card_to_ignores_an_unknown_column(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'X', 'board_column' => 'todo']);
+
+        Livewire::test(Board::class, ['project' => $project])
+            ->call('moveCardTo', $issue->id, 'nonsense', [$issue->id]);
+
+        $this->assertSame('todo', $issue->fresh()->board_column);
+    }
+
     public function test_move_card_ignores_an_unknown_column(): void
     {
         $this->actingAs(User::factory()->create());

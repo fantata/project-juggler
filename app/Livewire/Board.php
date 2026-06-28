@@ -68,6 +68,33 @@ class Board extends Component
     }
 
     /**
+     * Drag-and-drop: move a card to a column and persist the new order within
+     * it. $orderedIds is the target column's card ids in their dropped order.
+     * Everything is scoped to this project's cards.
+     */
+    public function moveCardTo(int $issueId, string $column, array $orderedIds = []): void
+    {
+        if (! array_key_exists($column, self::COLUMNS)) {
+            return;
+        }
+
+        $issue = $this->project->issues()->find($issueId);
+
+        if ($issue === null) {
+            return;
+        }
+
+        $issue->update(['board_column' => $column]);
+
+        // Renumber positions for the cards in the target column.
+        foreach (array_values($orderedIds) as $position => $id) {
+            $this->project->issues()->whereKey((int) $id)->update(['position' => $position]);
+        }
+
+        $this->project->update(['last_touched_at' => now()]);
+    }
+
+    /**
      * Assign a card to a user, or pass null to clear it. Only touches cards on
      * this project, and only allows real users.
      */
