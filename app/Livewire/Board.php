@@ -92,7 +92,14 @@ class Board extends Component
 
         $this->validate([
             'files' => 'array|max:10',
-            'files.*' => 'file|max:25600', // 25 MB each
+            // Allowlist safe types only. No SVG/HTML/scripts: served from our
+            // own origin they could execute JS in the session (stored XSS).
+            // Posters, audio and PDFs cover what actually lands on a card.
+            'files.*' => 'file|max:25600|mimes:jpg,jpeg,png,gif,webp,heic,pdf,'
+                .'mp3,wav,m4a,aac,ogg,mp4,mov,webm,txt,csv,doc,docx,xls,xlsx,ppt,pptx,zip',
+        ], [
+            'files.*.mimes' => "That file type isn't supported — try an image, PDF, audio, video or office doc.",
+            'files.*.max' => 'Files need to be under 25 MB each.',
         ]);
 
         $issue = $this->project->issues()->findOrFail($this->openCardId);

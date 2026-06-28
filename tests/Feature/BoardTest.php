@@ -131,6 +131,21 @@ class BoardTest extends TestCase
         Storage::disk('public')->assertExists($attachment->path);
     }
 
+    public function test_executable_file_types_are_rejected(): void
+    {
+        Storage::fake('public');
+        $this->actingAs(User::factory()->create());
+        $project = $this->project();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Poster', 'board_column' => 'todo']);
+
+        Livewire::test(Board::class, ['project' => $project])
+            ->call('openCard', $issue->id)
+            ->set('files', [UploadedFile::fake()->create('xss.svg', 2, 'image/svg+xml')])
+            ->assertHasErrors('files.*');
+
+        $this->assertSame(0, $issue->fresh()->attachments()->count());
+    }
+
     public function test_deleting_an_attachment_removes_the_file(): void
     {
         Storage::fake('public');
@@ -140,7 +155,7 @@ class BoardTest extends TestCase
 
         $component = Livewire::test(Board::class, ['project' => $project])
             ->call('openCard', $issue->id)
-            ->set('files', [UploadedFile::fake()->create('cue.mp3', 200)]);
+            ->set('files', [UploadedFile::fake()->create('cue.mp3', 200, 'audio/mpeg')]);
 
         $attachment = $issue->fresh()->attachments()->first();
         $path = $attachment->path;
