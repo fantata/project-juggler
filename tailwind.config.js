@@ -22,6 +22,11 @@ export default {
                 lg: ['1.125rem', { lineHeight: '1.75rem' }],    // 18px (unchanged)
             },
             colors: {
+                // Extends Tailwind's default gray scale with the one shade the
+                // dark-mode surfaces reach for (between gray-700 and gray-800).
+                gray: {
+                    750: '#28303E',
+                },
                 cream: {
                     50: '#FFFDF9',
                     100: '#FFF8F0',
