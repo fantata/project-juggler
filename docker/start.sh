@@ -21,8 +21,10 @@ else
     echo "WARNING: DB_HOST not set, skipping database wait"
 fi
 
-# Run migrations
-php artisan migrate --force
+# NOTE: migrations are NOT run here. They run once per deploy via the deploy
+# workflow (docker exec ... migrate --force). Running them on every boot raced
+# the deploy's migrate against the same DB and, with `set -e`, crash-looped the
+# container whenever a migration was half-applied. Boot must not migrate.
 
 # Publish Livewire assets
 php artisan livewire:publish --assets
