@@ -14,6 +14,25 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=atkinson-hyperlegible-next:400,500,600,700&display=swap" rel="stylesheet" />
 
+        {{-- Theme: seed before paint, then re-assert whenever the class is
+             stripped. wire:navigate morphs <html> to server markup (no dark
+             class); on some pages (e.g. the @script calendar) livewire:navigated
+             isn't reliable, so we watch <html> directly and put it back. --}}
+        <script>
+            (function () {
+                const root = document.documentElement;
+                const wantDark = function () {
+                    const t = localStorage.getItem('theme');
+                    return t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                };
+                const apply = function () { root.classList.toggle('dark', wantDark()); };
+                apply();
+                new MutationObserver(function () {
+                    if (root.classList.contains('dark') !== wantDark()) apply();
+                }).observe(root, { attributes: true, attributeFilter: ['class'] });
+            })();
+        </script>
+
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @livewireStyles
@@ -83,6 +102,8 @@
 
                 <!-- User Section -->
                 <div class="px-3 py-4 border-t border-cream-200 dark:border-gray-700">
+                    <x-theme-toggle class="w-full mb-1 px-3 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-terracotta-600 dark:hover:text-terracotta-400 hover:bg-cream-100 dark:hover:bg-gray-700 rounded-lg transition-colors" />
+
                     <x-sidebar-link :href="route('profile.edit')" :active="request()->routeIs('profile.*')">
                         <x-slot name="icon">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -121,6 +142,10 @@
                     {{ $slot }}
                 </main>
             </div>
+
+            <!-- Mobile theme toggle (floats above the bottom tabs) -->
+            <x-theme-toggle :show-label="false"
+                class="md:hidden fixed bottom-20 right-4 z-30 w-11 h-11 justify-center rounded-full bg-white dark:bg-gray-800 border border-cream-200 dark:border-gray-700 shadow-lg text-gray-500 dark:text-gray-300" />
 
             <!-- Mobile Bottom Tabs -->
             <nav class="md:hidden fixed bottom-0 inset-x-0 bg-white dark:bg-gray-800 border-t border-cream-200 dark:border-gray-700 z-30 safe-area-bottom">

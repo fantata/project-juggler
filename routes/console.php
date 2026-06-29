@@ -17,3 +17,11 @@ Schedule::command('brief:send')
     ->onOneServer()
     ->environments(['production'])
     ->appendOutputTo(storage_path('logs/daily-brief.log'));
+
+// Morning sweep — 6am shared nudges to Chris + Danny, only in production
+Schedule::command('sweep:send')
+    ->dailyAt('06:00')
+    ->runInBackground()
+    ->onOneServer()
+    ->environments(['production'])
+    ->appendOutputTo(storage_path('logs/morning-sweep.log'));

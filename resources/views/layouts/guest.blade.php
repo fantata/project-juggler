@@ -14,6 +14,23 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
+        {{-- Theme: seed before paint, then re-assert if the class is stripped
+             (wire:navigate morphs <html> to server markup with no dark class). --}}
+        <script>
+            (function () {
+                const root = document.documentElement;
+                const wantDark = function () {
+                    const t = localStorage.getItem('theme');
+                    return t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                };
+                const apply = function () { root.classList.toggle('dark', wantDark()); };
+                apply();
+                new MutationObserver(function () {
+                    if (root.classList.contains('dark') !== wantDark()) apply();
+                }).observe(root, { attributes: true, attributeFilter: ['class'] });
+            })();
+        </script>
+
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>

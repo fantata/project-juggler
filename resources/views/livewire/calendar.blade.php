@@ -146,3 +146,6 @@
     </div>
 @endif
 
+{{-- The calendarWidget Alpine component is bundled via resources/js/calendar.js
+     (imported in app.js). It used to be an inline @script with ES imports,
+     which Livewire can't evaluate — see that file. --}}

@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Fantata\Auth\Concerns\HasFantataId;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -39,6 +41,20 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Up-to-two-letter initials for avatar chips (e.g. "Chris Read" -> "CR").
+     */
+    protected function initials(): Attribute
+    {
+        return Attribute::get(fn (): string => Str::of($this->name)
+            ->trim()
+            ->explode(' ')
+            ->filter()
+            ->take(2)
+            ->map(fn (string $part): string => Str::upper(Str::substr($part, 0, 1)))
+            ->implode(''));
     }
 
     /**

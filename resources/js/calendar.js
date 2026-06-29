@@ -1,6 +1,6 @@
 // FullCalendar widget, bundled through Vite and registered as an Alpine
 // component. It used to live in an inline @script with ES imports, which
-// Livewire evaluates via Function() — that throws "Cannot use import
+// Livewire evaluates via new Function() — that throws "Cannot use import
 // statement outside a module" and broke the whole page's JS. Bundling here
 // fixes that (and the calendar actually renders now).
 import { Calendar } from '@fullcalendar/core';

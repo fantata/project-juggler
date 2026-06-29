@@ -8,6 +8,7 @@ use App\Enums\IssueUrgency;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Issue extends Model
 {
@@ -16,9 +17,15 @@ class Issue extends Model
         'title',
         'description',
         'status',
+        'assignee_id',
+        'kind',
+        'board_column',
+        'position',
         'urgency',
         'due_bucket',
         'is_question',
+        'answer',
+        'answered_at',
         'github_issue_number',
     ];
 
@@ -29,6 +36,8 @@ class Issue extends Model
             'urgency' => IssueUrgency::class,
             'due_bucket' => DueBucket::class,
             'is_question' => 'boolean',
+            'answered_at' => 'datetime',
+            'position' => 'integer',
         ];
     }
 
@@ -37,8 +46,23 @@ class Issue extends Model
         return $this->belongsTo(Project::class);
     }
 
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assignee_id');
+    }
+
     public function tasks(): HasMany
     {
         return $this->hasMany(IssueTask::class)->orderBy('position');
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable')->latest();
+    }
+
+    public function comments(): MorphMany
+    {
+        return $this->morphMany(Comment::class, 'commentable');
     }
 }

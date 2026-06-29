@@ -1,7 +1,10 @@
 <?php
 
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\IcsController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\QuestionAnswerController;
+use App\Livewire\Board;
 use App\Livewire\Calendar;
 use App\Livewire\Dashboard;
 use App\Livewire\FeedManager;
@@ -22,6 +25,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/feeds', FeedManager::class)->name('feeds.manage');
     // Named projects.detail (not projects.show) to avoid collision with apiResource in api.php
     Route::get('/projects/{project}', ProjectDetail::class)->name('projects.detail');
+    Route::get('/projects/{project}/board', Board::class)->name('projects.board');
+    Route::get('/attachments/{attachment}', AttachmentController::class)->name('attachments.show');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -31,5 +36,15 @@ Route::middleware(['auth'])->group(function () {
 
 // ICS feed (public, authenticated by unique token in URL)
 Route::get('/ics/{token}.ics', IcsController::class)->name('ics.feed');
+
+// Yes/no answer from the emailed link. No login — the signed URL is the auth.
+// GET shows a confirmation page (safe for link pre-fetch); POST commits the
+// answer (CSRF-protected, human-initiated).
+Route::get('/questions/{issue}/answer/{answer}', [QuestionAnswerController::class, 'show'])
+    ->name('questions.answer')
+    ->middleware('signed');
+Route::post('/questions/{issue}/answer/{answer}', [QuestionAnswerController::class, 'store'])
+    ->name('questions.answer.commit')
+    ->middleware('signed');
 
 require __DIR__.'/auth.php';

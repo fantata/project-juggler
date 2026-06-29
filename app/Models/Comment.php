@@ -6,34 +6,34 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
-class Message extends Model
+class Comment extends Model
 {
     protected $fillable = [
-        'sender_id',
-        'project_id',
+        'user_id',
         'parent_id',
         'body',
     ];
 
-    public function sender(): BelongsTo
+    public function commentable(): MorphTo
     {
-        return $this->belongsTo(User::class, 'sender_id');
+        return $this->morphTo();
     }
 
-    public function project(): BelongsTo
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(Project::class);
+        return $this->belongsTo(User::class);
     }
 
     public function parent(): BelongsTo
     {
-        return $this->belongsTo(Message::class, 'parent_id');
+        return $this->belongsTo(Comment::class, 'parent_id');
     }
 
     public function replies(): HasMany
     {
-        return $this->hasMany(Message::class, 'parent_id');
+        return $this->hasMany(Comment::class, 'parent_id');
     }
 
     public function reactions(): MorphMany
