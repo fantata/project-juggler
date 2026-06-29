@@ -25,14 +25,15 @@ class Together extends Component
 
     public bool $showAdd = false;
 
+    /** Timeframes that mean "this wants attention soon" (whenever does not). */
+    private const SOON = ['today', 'tomorrow', 'this_week', 'next_week'];
+
     public function mount(): void
     {
         $this->project_id = $this->sharedProject()->id;
     }
 
-    /**
-     * The default home for items added here. Created once if it doesn't exist.
-     */
+    /** The default home for items added here. Created once if it doesn't exist. */
     protected function sharedProject(): Project
     {
         return Project::firstOrCreate(
@@ -67,28 +68,49 @@ class Together extends Component
 
     public function render()
     {
-        $openIssues = Issue::with('project')
+        $shared = $this->sharedProject();
+
+        $open = Issue::with('project')
             ->whereIn('status', ['open', 'in_progress'])
             ->whereHas('project', fn ($query) => $query->active())
             ->orderByDesc('created_at')
             ->get();
 
-        // Group by due bucket. "Whenever" sits near the end (sortOrder 5) and
-        // anything without a bucket falls in last.
-        $groups = $openIssues
-            ->groupBy(fn (Issue $issue) => $issue->due_bucket?->value ?? '_none')
+        // 1. Questions waiting on an answer — the things that genuinely need a person.
+        $questions = $open
+            ->filter(fn (Issue $i) => $i->is_question && $i->answer === null)
+            ->values();
+
+        $rest = $open->reject(fn (Issue $i) => $i->is_question && $i->answer === null);
+
+        // 2. On the radar: anything shared here, or given a real timeframe.
+        $onRadar = $rest->filter(fn (Issue $i) => $i->project_id === $shared->id
+            || in_array($i->due_bucket?->value, self::SOON, true));
+
+        $radarGroups = $onRadar
+            ->groupBy(fn (Issue $i) => in_array($i->due_bucket?->value, self::SOON, true)
+                ? $i->due_bucket->value
+                : 'shared')
             ->map(fn ($items, $key) => [
                 'key' => $key,
-                'label' => $key === '_none' ? 'No timeframe yet' : DueBucket::from($key)->label(),
-                'order' => $key === '_none' ? 99 : DueBucket::from($key)->sortOrder(),
+                'label' => $key === 'shared' ? 'Shared' : DueBucket::from($key)->label(),
+                'order' => $key === 'shared' ? 9 : DueBucket::from($key)->sortOrder(),
                 'items' => $items,
             ])
             ->sortBy('order')
             ->values();
 
+        // 3. Everything else — quiet project tasks, no action needed. Collapsed.
+        $other = $rest
+            ->reject(fn (Issue $i) => $onRadar->contains('id', $i->id))
+            ->groupBy(fn (Issue $i) => $i->project->name)
+            ->sortKeys();
+
         return view('livewire.together', [
-            'groups' => $groups,
-            'openCount' => $openIssues->count(),
+            'questions' => $questions,
+            'radarGroups' => $radarGroups,
+            'otherByProject' => $other,
+            'otherCount' => $other->flatten()->count(),
             'projects' => Project::active()->orderBy('name')->get(),
             'dueBuckets' => DueBucket::cases(),
         ]);

@@ -89,25 +89,28 @@ class TogetherTest extends TestCase
         $this->assertSame($user->id, $message->sender_id);
     }
 
-    public function test_open_issues_are_grouped_by_due_bucket(): void
+    public function test_shared_timed_and_questions_surface_but_project_tasks_tuck_away(): void
     {
         $this->actingAs(User::factory()->create());
 
-        $project = Project::create([
-            'name' => 'Shared',
-            'type' => 'personal',
-            'status' => 'active',
-            'money_status' => 'none',
-        ]);
+        $shared = Project::create(['name' => 'Shared', 'type' => 'personal', 'status' => 'active', 'money_status' => 'none']);
+        $other = Project::create(['name' => 'Client work', 'type' => 'personal', 'status' => 'active', 'money_status' => 'none']);
 
-        Issue::create(['project_id' => $project->id, 'title' => 'Today thing', 'status' => 'open', 'urgency' => 'medium', 'due_bucket' => 'today']);
-        Issue::create(['project_id' => $project->id, 'title' => 'Someday thing', 'status' => 'open', 'urgency' => 'medium', 'due_bucket' => 'whenever']);
-        Issue::create(['project_id' => $project->id, 'title' => 'Unbucketed thing', 'status' => 'open', 'urgency' => 'medium']);
+        // Surface: a timed shared item, an untimed shared item, and a question.
+        Issue::create(['project_id' => $shared->id, 'title' => 'Today thing', 'status' => 'open', 'urgency' => 'medium', 'due_bucket' => 'today']);
+        Issue::create(['project_id' => $shared->id, 'title' => 'Shared whenever', 'status' => 'open', 'urgency' => 'medium', 'due_bucket' => 'whenever']);
+        Issue::create(['project_id' => $shared->id, 'title' => 'Need a decision', 'status' => 'open', 'urgency' => 'medium', 'is_question' => true]);
+
+        // Tuck away: a no-timeframe task in another project (needs no action).
+        Issue::create(['project_id' => $other->id, 'title' => 'Quiet project task', 'status' => 'open', 'urgency' => 'medium', 'due_bucket' => 'whenever']);
 
         Livewire::test(Together::class)
-            ->assertSee('Today thing')
-            ->assertSee('Someday thing')
-            ->assertSee('Unbucketed thing')
-            ->assertSee('No timeframe yet');
+            ->assertSee('Needs an answer')      // questions section
+            ->assertSee('Need a decision')
+            ->assertSee('Today thing')          // on the radar (Today)
+            ->assertSee('Shared whenever')      // on the radar (Shared)
+            ->assertSee('no action needed')     // the collapsed "from the projects" toggle
+            ->assertSee('Client work')          // grouped under its project
+            ->assertSee('Quiet project task');  // present, just tucked away
     }
 }
