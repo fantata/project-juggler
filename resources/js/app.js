@@ -1,4 +1,5 @@
 import './bootstrap';
+import './calendar'; // registers the FullCalendar Alpine component (bundled, not inline)
 
 // Alpine is bundled with Livewire 3+, don't import separately
 
