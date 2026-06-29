@@ -26,6 +26,8 @@
         "@fullcalendar/list": "^6.1.20",
         "@fullcalendar/timegrid": "^6.1.20",
         "@simplewebauthn/browser": "^13.3.0",
+        "laravel-echo": "^2.3.7",
+        "pusher-js": "^8.5.0",
         "sortablejs": "^1.15.7"
     }
 }
