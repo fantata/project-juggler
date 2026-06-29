@@ -22,6 +22,7 @@ document.addEventListener('alpine:init', () => {
         localStream: null,
         channel: null,
         pendingOffer: null,
+        iceQueue: [], // candidates that arrive before the remote description is set
 
         init() {
             if (! window.Echo) {
@@ -47,6 +48,7 @@ document.addEventListener('alpine:init', () => {
 
         // ── Outgoing ────────────────────────────────────────────────
         async startCall() {
+            if (this.state !== 'idle') return;
             try {
                 this.error = null;
                 await this.getMedia();
@@ -64,11 +66,15 @@ document.addEventListener('alpine:init', () => {
         async onAnswer(e) {
             if (! this.pc) return;
             await this.pc.setRemoteDescription(new RTCSessionDescription(e.sdp));
+            await this.flushIce();
             this.state = 'connecting';
         },
 
         // ── Incoming ────────────────────────────────────────────────
         onOffer(e) {
+            // Only accept a fresh offer when we're free — ignore otherwise so an
+            // offer mid-call (or simultaneous glare) can't overwrite a live peer.
+            if (this.state !== 'idle') return;
             this.pendingOffer = e.sdp;
             this.state = 'ringing';
         },
@@ -78,6 +84,7 @@ document.addEventListener('alpine:init', () => {
                 await this.getMedia();
                 this.makePeer();
                 await this.pc.setRemoteDescription(new RTCSessionDescription(this.pendingOffer));
+                await this.flushIce();
                 const answer = await this.pc.createAnswer();
                 await this.pc.setLocalDescription(answer);
                 this.channel.whisper('answer', { sdp: this.pc.localDescription });
@@ -95,14 +102,33 @@ document.addEventListener('alpine:init', () => {
         },
 
         async onIce(e) {
-            if (! this.pc || ! e.candidate) return;
+            if (! e.candidate) return;
+            // Buffer until the remote description exists, then add — otherwise
+            // addIceCandidate throws and the candidate is lost (can stop a call
+            // ever connecting).
+            if (! this.pc || ! this.pc.remoteDescription) {
+                this.iceQueue.push(e.candidate);
+                return;
+            }
             try {
                 await this.pc.addIceCandidate(new RTCIceCandidate(e.candidate));
-            } catch (_) { /* candidate can arrive before remote desc; ignore */ }
+            } catch (_) { /* ignore a duplicate/late candidate */ }
+        },
+
+        async flushIce() {
+            if (! this.pc) return;
+            const queued = this.iceQueue;
+            this.iceQueue = [];
+            for (const candidate of queued) {
+                try {
+                    await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
+                } catch (_) { /* ignore */ }
+            }
         },
 
         // ── Plumbing ────────────────────────────────────────────────
         makePeer() {
+            this.pc?.close(); // never leak a previous connection
             this.pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
             this.localStream.getTracks().forEach((t) => this.pc.addTrack(t, this.localStream));
@@ -116,11 +142,14 @@ document.addEventListener('alpine:init', () => {
             this.pc.onconnectionstatechange = () => {
                 const s = this.pc?.connectionState;
                 if (s === 'connected') this.state = 'in-call';
-                if (s === 'failed' || s === 'disconnected' || s === 'closed') this.endCall();
+                // 'disconnected' is often transient and can recover — only end on
+                // a terminal state.
+                if (s === 'failed' || s === 'closed') this.endCall();
             };
         },
 
         async getMedia() {
+            this.localStream?.getTracks().forEach((t) => t.stop()); // drop any prior stream
             this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: this.videoOn });
             if (this.$refs.localVideo) this.$refs.localVideo.srcObject = this.localStream;
         },
@@ -150,6 +179,7 @@ document.addEventListener('alpine:init', () => {
             this.localStream?.getTracks().forEach((t) => t.stop());
             this.localStream = null;
             this.pendingOffer = null;
+            this.iceQueue = [];
             this.muted = false;
             this.state = 'idle';
             if (this.$refs.remoteVideo) this.$refs.remoteVideo.srcObject = null;

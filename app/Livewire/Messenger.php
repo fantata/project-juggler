@@ -14,7 +14,9 @@ class Messenger extends Component
     #[Validate('required|string|max:2000')]
     public string $body = '';
 
-    /** The message currently being replied to, if any. */
+    /** The message currently being replied to. Server-set via startReply (which
+     *  validates it against this room), so lock it against client tampering. */
+    #[Locked]
     public ?int $replyingTo = null;
 
     /**

@@ -151,9 +151,4 @@
             </div>
         @endif
     </div>
-
-    {{-- MESSAGES --}}
-    <div x-show="tab === 'messages'" x-cloak class="pb-4">
-        <livewire:messenger />
-    </div>
 </div>
