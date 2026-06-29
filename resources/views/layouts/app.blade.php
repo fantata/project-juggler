@@ -190,6 +190,10 @@
                 </div>
             </nav>
         </div>
+
+        {{-- Floating WebRTC call (desktop, bottom-right) --}}
+        @include('partials.call-widget')
+
         @livewireScripts
     </body>
 </html>

@@ -2,26 +2,10 @@
     <h2 class="font-semibold text-xl text-bark-800 dark:text-cream-200 leading-tight">Together</h2>
 </x-slot>
 
-<div class="max-w-2xl mx-auto" x-data="{ tab: 'priorities' }">
+<div class="max-w-2xl mx-auto">
 
-    {{-- Tab switcher --}}
-    <div class="sticky top-0 z-10 -mx-4 px-4 pt-1 pb-3 bg-cream-100/90 dark:bg-gray-900/90 backdrop-blur-sm sm:mx-0 sm:px-0">
-        <div class="flex gap-2 p-1 bg-white dark:bg-gray-800 rounded-2xl border border-cream-200 dark:border-gray-700">
-            <button type="button" @click="tab = 'priorities'"
-                :class="tab === 'priorities' ? 'bg-terracotta-500 text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'"
-                class="flex-1 rounded-xl py-3 text-base font-semibold transition-colors">
-                Priorities
-            </button>
-            <button type="button" @click="tab = 'messages'"
-                :class="tab === 'messages' ? 'bg-terracotta-500 text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'"
-                class="flex-1 rounded-xl py-3 text-base font-semibold transition-colors">
-                Messages
-            </button>
-        </div>
-    </div>
-
-    {{-- PRIORITIES --}}
-    <div x-show="tab === 'priorities'" x-cloak class="space-y-6 pb-8">
+    {{-- PRIORITIES (talking now happens over the floating call widget) --}}
+    <div class="space-y-6 pb-8">
 
         <p class="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
             Our shared space. Add anything that needs the other person, or ask a question — the quiet project work stays tucked away below.

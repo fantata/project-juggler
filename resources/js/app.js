@@ -2,6 +2,7 @@ import './bootstrap';
 import Sortable from 'sortablejs';
 import focus from '@alpinejs/focus';
 import './calendar'; // registers the FullCalendar Alpine component (bundled, not inline)
+import './call';     // registers the WebRTC call widget (Reverb-signalled)
 
 // Alpine is bundled with Livewire 3+, don't import separately — register plugins
 // on its init hook instead.
