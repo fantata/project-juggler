@@ -92,34 +92,62 @@
                             @if ($issue->description)
                                 <p class="mt-1 text-base text-gray-600 dark:text-gray-300 leading-relaxed">{{ $issue->description }}</p>
                             @endif
-                            <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">{{ $issue->project->name }}</p>
+                            <div class="mt-2.5 flex items-center gap-2">
+                                <button type="button" wire:click="answer({{ $issue->id }}, 'Yes')"
+                                    class="rounded-lg bg-moss-600 text-white px-4 py-1.5 text-sm font-semibold hover:bg-moss-700">Yes</button>
+                                <button type="button" wire:click="answer({{ $issue->id }}, 'No')"
+                                    class="rounded-lg bg-white dark:bg-gray-700 text-bark-700 dark:text-cream-200 border border-moss-300 dark:border-moss-600 px-4 py-1.5 text-sm font-semibold hover:bg-moss-100 dark:hover:bg-gray-600">No</button>
+                                <span class="ml-auto text-sm text-gray-500 dark:text-gray-400">{{ $issue->project->name }}</span>
+                            </div>
                         </li>
                     @endforeach
                 </ul>
             </section>
         @endif
 
-        {{-- On the radar — shared + time-bucketed --}}
-        @foreach ($radarGroups as $group)
-            <section wire:key="radar-{{ $group['key'] }}">
-                <h3 class="px-1 mb-2 text-sm font-semibold uppercase tracking-wide text-bark-500 dark:text-cream-300/70">{{ $group['label'] }}</h3>
-                <ul class="space-y-2">
-                    @foreach ($group['items'] as $issue)
-                        <li wire:key="r-{{ $issue->id }}"
-                            class="rounded-2xl border px-4 py-3.5 bg-white dark:bg-gray-800 border-cream-200 dark:border-gray-700">
-                            <p class="text-base font-medium text-bark-800 dark:text-cream-100">{{ $issue->title }}</p>
-                            @if ($issue->description)
-                                <p class="mt-1 text-base text-gray-600 dark:text-gray-300 leading-relaxed">{{ $issue->description }}</p>
-                            @endif
-                            <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">{{ $issue->project->name }}</p>
+        {{-- On the radar — one list, drag the handle to reorder, tick to finish --}}
+        @if ($radar->isNotEmpty())
+            <section>
+                <h3 class="px-1 mb-2 text-sm font-semibold uppercase tracking-wide text-bark-500 dark:text-cream-300/70">On the radar</h3>
+                <ul class="space-y-2"
+                    x-data
+                    x-init="window.Sortable && window.Sortable.create($el, {
+                        animation: window.boardSortAnimation,
+                        handle: '[data-drag]',
+                        draggable: '[data-id]',
+                        ghostClass: 'opacity-40',
+                        onEnd() {
+                            $wire.reorder(Array.from($el.querySelectorAll('[data-id]')).map(el => el.dataset.id));
+                        },
+                    })">
+                    @foreach ($radar as $issue)
+                        @php $bucket = $issue->due_bucket?->value; @endphp
+                        <li wire:key="r-{{ $issue->id }}" data-id="{{ $issue->id }}"
+                            class="flex items-start gap-3 rounded-2xl border px-3 py-3 bg-white dark:bg-gray-800 border-cream-200 dark:border-gray-700">
+                            <button type="button" data-drag aria-label="Drag to reorder"
+                                class="mt-0.5 shrink-0 cursor-grab active:cursor-grabbing touch-none text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"/></svg>
+                            </button>
+                            <button type="button" wire:click="complete({{ $issue->id }})" aria-label="Mark done"
+                                class="mt-0.5 shrink-0 w-6 h-6 rounded-full border-2 border-cream-300 dark:border-gray-600 hover:border-moss-500 hover:bg-moss-50 dark:hover:bg-moss-900/30 transition-colors"></button>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-base font-medium text-bark-800 dark:text-cream-100">{{ $issue->title }}</p>
+                                @if ($issue->description)
+                                    <p class="mt-0.5 text-base text-gray-600 dark:text-gray-300 leading-relaxed">{{ $issue->description }}</p>
+                                @endif
+                                <div class="mt-1.5 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                    <span class="inline-flex items-center rounded-full bg-cream-100 dark:bg-gray-700 px-2 py-0.5 font-medium text-bark-600 dark:text-cream-300">{{ in_array($bucket, $soon, true) ? $issue->due_bucket->label() : 'Shared' }}</span>
+                                    <span>{{ $issue->project->name }}</span>
+                                </div>
+                            </div>
                         </li>
                     @endforeach
                 </ul>
             </section>
-        @endforeach
+        @endif
 
         {{-- Calm state when nothing needs attention --}}
-        @if ($questions->isEmpty() && $radarGroups->isEmpty())
+        @if ($questions->isEmpty() && $radar->isEmpty())
             <div class="text-center py-10">
                 <p class="text-base text-gray-500 dark:text-gray-400">Nothing needs you right now. All calm. &#9749;</p>
             </div>
@@ -140,7 +168,9 @@
                             <h4 class="px-1 mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">{{ $projectName }}</h4>
                             <ul class="rounded-xl border border-cream-200 dark:border-gray-700 divide-y divide-cream-100 dark:divide-gray-700/70 overflow-hidden">
                                 @foreach ($items as $issue)
-                                    <li wire:key="o-{{ $issue->id }}" class="px-4 py-2.5 bg-white dark:bg-gray-800">
+                                    <li wire:key="o-{{ $issue->id }}" class="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-gray-800">
+                                        <button type="button" wire:click="complete({{ $issue->id }})" aria-label="Mark done"
+                                            class="shrink-0 w-5 h-5 rounded-full border-2 border-cream-300 dark:border-gray-600 hover:border-moss-500 hover:bg-moss-50 dark:hover:bg-moss-900/30 transition-colors"></button>
                                         <span class="text-sm text-bark-700 dark:text-cream-200">{{ $issue->title }}</span>
                                     </li>
                                 @endforeach

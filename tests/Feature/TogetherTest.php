@@ -113,4 +113,47 @@ class TogetherTest extends TestCase
             ->assertSee('Client work')          // grouped under its project
             ->assertSee('Quiet project task');  // present, just tucked away
     }
+
+    public function test_an_item_can_be_marked_done(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $project = Project::create(['name' => 'Shared', 'type' => 'personal', 'status' => 'active', 'money_status' => 'none']);
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Finish me', 'status' => 'open', 'urgency' => 'medium', 'due_bucket' => 'today']);
+
+        Livewire::test(Together::class)
+            ->assertSee('Finish me')
+            ->call('complete', $issue->id)
+            ->assertDontSee('Finish me'); // drops off the open list
+
+        $this->assertSame('done', $issue->fresh()->status->value);
+    }
+
+    public function test_a_question_can_be_answered_inline(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $project = Project::create(['name' => 'Shared', 'type' => 'personal', 'status' => 'active', 'money_status' => 'none']);
+        $question = Issue::create(['project_id' => $project->id, 'title' => 'Ship Friday?', 'status' => 'open', 'urgency' => 'medium', 'is_question' => true]);
+
+        Livewire::test(Together::class)
+            ->assertSee('Ship Friday?')
+            ->call('answer', $question->id, 'Yes')
+            ->assertDontSee('Ship Friday?'); // answered → leaves the questions list
+
+        $question->refresh();
+        $this->assertSame('Yes', $question->answer);
+        $this->assertNotNull($question->answered_at);
+    }
+
+    public function test_priorities_can_be_reordered(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $project = Project::create(['name' => 'Shared', 'type' => 'personal', 'status' => 'active', 'money_status' => 'none']);
+        $a = Issue::create(['project_id' => $project->id, 'title' => 'A', 'status' => 'open', 'urgency' => 'medium', 'due_bucket' => 'today']);
+        $b = Issue::create(['project_id' => $project->id, 'title' => 'B', 'status' => 'open', 'urgency' => 'medium', 'due_bucket' => 'today']);
+
+        Livewire::test(Together::class)->call('reorder', [$b->id, $a->id]);
+
+        $this->assertSame(0, $b->fresh()->position); // dragged to the top
+        $this->assertSame(1, $a->fresh()->position);
+    }
 }

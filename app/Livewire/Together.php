@@ -66,6 +66,30 @@ class Together extends Component
         $this->project_id = $this->sharedProject()->id;
     }
 
+    /** Mark an item done — it drops off the open list. */
+    public function complete(int $issueId): void
+    {
+        Issue::query()->whereKey($issueId)->update(['status' => 'done']);
+    }
+
+    /** Answer a question (yes/no or free text) — it leaves the questions list. */
+    public function answer(int $issueId, string $value): void
+    {
+        $issue = Issue::find($issueId);
+
+        if ($issue && $issue->is_question) {
+            $issue->update(['answer' => $value, 'answered_at' => now()]);
+        }
+    }
+
+    /** Persist a hand-dragged priority order. $orderedIds is the radar list, top first. */
+    public function reorder(array $orderedIds): void
+    {
+        foreach (array_values($orderedIds) as $position => $id) {
+            Issue::query()->whereKey((int) $id)->update(['position' => $position]);
+        }
+    }
+
     public function render()
     {
         $shared = $this->sharedProject();
@@ -81,34 +105,28 @@ class Together extends Component
             ->filter(fn (Issue $i) => $i->is_question && $i->answer === null)
             ->values();
 
-        $rest = $open->reject(fn (Issue $i) => $i->is_question && $i->answer === null);
+        // Questions live only in the questions section; once answered they're
+        // resolved and drop off Together entirely (the answer is recorded).
+        $rest = $open->reject(fn (Issue $i) => $i->is_question);
 
-        // 2. On the radar: anything shared here, or given a real timeframe.
-        $onRadar = $rest->filter(fn (Issue $i) => $i->project_id === $shared->id
-            || in_array($i->due_bucket?->value, self::SOON, true));
-
-        $radarGroups = $onRadar
-            ->groupBy(fn (Issue $i) => in_array($i->due_bucket?->value, self::SOON, true)
-                ? $i->due_bucket->value
-                : 'shared')
-            ->map(fn ($items, $key) => [
-                'key' => $key,
-                'label' => $key === 'shared' ? 'Shared' : DueBucket::from($key)->label(),
-                'order' => $key === 'shared' ? 9 : DueBucket::from($key)->sortOrder(),
-                'items' => $items,
-            ])
-            ->sortBy('order')
+        // 2. On the radar: anything shared here, or given a real timeframe — one flat
+        //    list in hand-dragged priority order (position), newest first as tie-break.
+        $radar = $rest
+            ->filter(fn (Issue $i) => $i->project_id === $shared->id
+                || in_array($i->due_bucket?->value, self::SOON, true))
+            ->sortBy('position')
             ->values();
 
         // 3. Everything else — quiet project tasks, no action needed. Collapsed.
         $other = $rest
-            ->reject(fn (Issue $i) => $onRadar->contains('id', $i->id))
+            ->reject(fn (Issue $i) => $radar->contains('id', $i->id))
             ->groupBy(fn (Issue $i) => $i->project->name)
             ->sortKeys();
 
         return view('livewire.together', [
             'questions' => $questions,
-            'radarGroups' => $radarGroups,
+            'radar' => $radar,
+            'soon' => self::SOON,
             'otherByProject' => $other,
             'otherCount' => $other->flatten()->count(),
             'projects' => Project::active()->orderBy('name')->get(),
