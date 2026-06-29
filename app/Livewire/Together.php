@@ -66,16 +66,29 @@ class Together extends Component
         $this->project_id = $this->sharedProject()->id;
     }
 
+    /**
+     * Issues this screen is allowed to act on — those in active projects (exactly
+     * what render() surfaces). This app has no per-user project membership; both
+     * users see every active project by design (as with the board/messenger), so
+     * "actionable" is bounded to the active set rather than to a single user.
+     */
+    private function actionableIssue(int $issueId): ?Issue
+    {
+        return Issue::whereKey($issueId)
+            ->whereHas('project', fn ($query) => $query->active())
+            ->first();
+    }
+
     /** Mark an item done — it drops off the open list. */
     public function complete(int $issueId): void
     {
-        Issue::query()->whereKey($issueId)->update(['status' => 'done']);
+        $this->actionableIssue($issueId)?->update(['status' => 'done']);
     }
 
     /** Answer a question (yes/no or free text) — it leaves the questions list. */
     public function answer(int $issueId, string $value): void
     {
-        $issue = Issue::find($issueId);
+        $issue = $this->actionableIssue($issueId);
 
         if ($issue && $issue->is_question) {
             $issue->update(['answer' => $value, 'answered_at' => now()]);
@@ -85,8 +98,15 @@ class Together extends Component
     /** Persist a hand-dragged priority order. $orderedIds is the radar list, top first. */
     public function reorder(array $orderedIds): void
     {
+        $allowed = Issue::whereIn('id', $orderedIds)
+            ->whereHas('project', fn ($query) => $query->active())
+            ->pluck('id')
+            ->all();
+
         foreach (array_values($orderedIds) as $position => $id) {
-            Issue::query()->whereKey((int) $id)->update(['position' => $position]);
+            if (in_array((int) $id, $allowed, true)) {
+                Issue::query()->whereKey((int) $id)->update(['position' => $position]);
+            }
         }
     }
 
