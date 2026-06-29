@@ -191,8 +191,10 @@
             </nav>
         </div>
 
-        {{-- Floating WebRTC call (desktop, bottom-right) --}}
-        @include('partials.call-widget')
+        {{-- Floating WebRTC call (desktop, bottom-right) — only where Reverb is configured --}}
+        @if (config('broadcasting.default') === 'reverb')
+            @include('partials.call-widget')
+        @endif
 
         @livewireScripts
     </body>
