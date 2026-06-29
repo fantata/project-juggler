@@ -3,14 +3,14 @@
      matter. --}}
 <div
     x-data
-    x-on:fantata-passkey-create.window="
+    x-on:fantata-passkey-create.window="(async () => {
         try {
             const credential = await window.fantataPasskey.register($event.detail.publicKey);
             $wire.finish(credential);
         } catch (e) {
             $wire.set('error', 'Passkey registration was cancelled.');
         }
-    "
+    })()"
 >
     <input
         type="email"
