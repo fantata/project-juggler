@@ -23,7 +23,7 @@
     }
 }
 
-/* FullCalendar warm theme overrides */
+/* ── FullCalendar: warm light theme ───────────────────────────────────── */
 .fc-warm {
     --fc-border-color: #F0E8D4;
     --fc-today-bg-color: #FFF8F0;
@@ -32,21 +32,10 @@
     --fc-event-border-color: transparent;
 }
 
-.dark .fc-warm {
-    --fc-border-color: #374151;
-    --fc-today-bg-color: #1f2937;
-    --fc-neutral-bg-color: #111827;
-    --fc-page-bg-color: transparent;
-}
-
 .fc-warm .fc-toolbar-title {
     font-size: 1.25rem;
     font-weight: 600;
     color: #42310A;
-}
-
-.dark .fc-warm .fc-toolbar-title {
-    color: #FFF8F0;
 }
 
 .fc-warm .fc-button {
@@ -66,22 +55,12 @@
     color: #42310A;
 }
 
+/* Terracotta active state works on both themes. */
 .fc-warm .fc-button-active,
 .fc-warm .fc-button.fc-button-active {
     background-color: #C2714F !important;
     border-color: #A85A3B !important;
-    color: white !important;
-}
-
-.dark .fc-warm .fc-button {
-    background-color: #374151;
-    border-color: #4B5563;
-    color: #D1D5DB;
-}
-
-.dark .fc-warm .fc-button:hover {
-    background-color: #4B5563;
-    color: #F9FAFB;
+    color: #fff !important;
 }
 
 .fc-warm .fc-event {
@@ -96,10 +75,6 @@
     padding: 0.25rem 0.5rem;
 }
 
-.dark .fc-warm .fc-daygrid-day-number {
-    color: #C4AD74;
-}
-
 .fc-warm .fc-col-header-cell-cushion {
     color: #8B6914;
     font-weight: 600;
@@ -108,8 +83,62 @@
     letter-spacing: 0.05em;
 }
 
-.dark .fc-warm .fc-col-header-cell-cushion {
-    color: #A68B4B;
+/* ── FullCalendar: classic dark theme ─────────────────────────────────────
+   Defined once and applied via both the .dark class (manual toggle) and the OS
+   preference (media), so it's correct whatever a branch's dark-mode strategy is.
+   Neutral slate surface, hairline grid, a warm 'today' tint, terracotta now-line
+   + today number, muted headers, dimmed other-month days, legible list view. */
+.dark .fc-warm,
+.fc-dark .fc-warm {
+    --fc-border-color: #2a3340;
+    --fc-page-bg-color: transparent;
+    --fc-neutral-bg-color: #161c24;
+    --fc-today-bg-color: rgba(194, 113, 79, 0.13);
+    --fc-now-indicator-color: #E8AD98;
+    --fc-list-event-hover-bg-color: #283040;
+    --fc-neutral-text-color: #94a3b8;
+}
+.dark .fc-warm .fc-toolbar-title,
+.fc-dark .fc-warm .fc-toolbar-title { color: #ECE7DD; }
+.dark .fc-warm .fc-button,
+.fc-dark .fc-warm .fc-button { background-color: #232b36; border-color: #313c4a; color: #cbd5e1; }
+.dark .fc-warm .fc-button:hover,
+.fc-dark .fc-warm .fc-button:hover { background-color: #2d3744; border-color: #3b4757; color: #f1f5f9; }
+.dark .fc-warm .fc-daygrid-day-number,
+.fc-dark .fc-warm .fc-daygrid-day-number { color: #94a3b8; }
+.dark .fc-warm .fc-day-today .fc-daygrid-day-number,
+.fc-dark .fc-warm .fc-day-today .fc-daygrid-day-number { color: #E8AD98; font-weight: 700; }
+.dark .fc-warm .fc-day-other .fc-daygrid-day-number,
+.fc-dark .fc-warm .fc-day-other .fc-daygrid-day-number { color: #5a6678; }
+.dark .fc-warm .fc-col-header-cell-cushion,
+.fc-dark .fc-warm .fc-col-header-cell-cushion { color: #94a3b8; }
+.dark .fc-warm .fc-list-day-cushion,
+.fc-dark .fc-warm .fc-list-day-cushion { background-color: #161c24; }
+.dark .fc-warm .fc-list-event-title,
+.dark .fc-warm .fc-list-event-time,
+.fc-dark .fc-warm .fc-list-event-title,
+.fc-dark .fc-warm .fc-list-event-time { color: #e5e7eb; }
+
+@media (prefers-color-scheme: dark) {
+    .fc-warm {
+        --fc-border-color: #2a3340;
+        --fc-page-bg-color: transparent;
+        --fc-neutral-bg-color: #161c24;
+        --fc-today-bg-color: rgba(194, 113, 79, 0.13);
+        --fc-now-indicator-color: #E8AD98;
+        --fc-list-event-hover-bg-color: #283040;
+        --fc-neutral-text-color: #94a3b8;
+    }
+    .fc-warm .fc-toolbar-title { color: #ECE7DD; }
+    .fc-warm .fc-button { background-color: #232b36; border-color: #313c4a; color: #cbd5e1; }
+    .fc-warm .fc-button:hover { background-color: #2d3744; border-color: #3b4757; color: #f1f5f9; }
+    .fc-warm .fc-daygrid-day-number { color: #94a3b8; }
+    .fc-warm .fc-day-today .fc-daygrid-day-number { color: #E8AD98; font-weight: 700; }
+    .fc-warm .fc-day-other .fc-daygrid-day-number { color: #5a6678; }
+    .fc-warm .fc-col-header-cell-cushion { color: #94a3b8; }
+    .fc-warm .fc-list-day-cushion { background-color: #161c24; }
+    .fc-warm .fc-list-event-title,
+    .fc-warm .fc-list-event-time { color: #e5e7eb; }
 }
 
 /* Safe area for iOS bottom bar */
