@@ -5,24 +5,22 @@
 // single server serves them all with isolated channels/credentials. When it's
 // absent (a normal app instance, not the hub) we fall back to the one app
 // configured from the REVERB_APP_* env below.
-$reverbApps = collect(json_decode((string) env('REVERB_APPS', '[]'), true) ?: [])
-    ->map(fn (array $app) => [
-        'key' => $app['key'] ?? null,
-        'secret' => $app['secret'] ?? null,
-        'app_id' => $app['app_id'] ?? null,
-        'options' => [
-            'host' => env('REVERB_HOST'),
-            'port' => env('REVERB_PORT', 443),
-            'scheme' => env('REVERB_SCHEME', 'https'),
-            'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
-        ],
-        'allowed_origins' => $app['allowed_origins'] ?? ['*'],
-        'ping_interval' => 60,
-        'activity_timeout' => 30,
-        'max_message_size' => 10_000,
-        'accept_client_events_from' => 'members',
-    ])
-    ->all();
+$reverbApps = array_map(fn (array $app) => [
+    'key' => $app['key'] ?? null,
+    'secret' => $app['secret'] ?? null,
+    'app_id' => $app['app_id'] ?? null,
+    'options' => [
+        'host' => env('REVERB_HOST'),
+        'port' => env('REVERB_PORT', 443),
+        'scheme' => env('REVERB_SCHEME', 'https'),
+        'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
+    ],
+    'allowed_origins' => $app['allowed_origins'] ?? ['*'],
+    'ping_interval' => 60,
+    'activity_timeout' => 30,
+    'max_message_size' => 10_000,
+    'accept_client_events_from' => 'members',
+], json_decode((string) env('REVERB_APPS', '[]'), true) ?: []);
 
 return [
 
