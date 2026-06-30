@@ -43,6 +43,19 @@
             })();
         </script>
 
+        {{-- Reverb connection for the realtime/call client, from server config
+             (runtime, not baked into the build). Set before the bundle loads. --}}
+        @if (config('broadcasting.default') === 'reverb')
+            <script>
+                window.__reverb = {
+                    key: @json(config('broadcasting.connections.reverb.key')),
+                    host: @json(config('broadcasting.connections.reverb.options.host')),
+                    port: @json(config('broadcasting.connections.reverb.options.port')),
+                    scheme: @json(config('broadcasting.connections.reverb.options.scheme')),
+                };
+            </script>
+        @endif
+
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @livewireStyles
