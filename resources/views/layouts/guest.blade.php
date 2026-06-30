@@ -9,6 +9,16 @@
 
         <!-- Favicon -->
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M20 70 Q50-10 80 70' fill='none' stroke='%23cbd5e1' stroke-width='4' stroke-linecap='round'/><circle cx='20' cy='70' r='15' fill='%23f97316'/><circle cx='50' cy='18' r='15' fill='%236366f1'/><circle cx='80' cy='70' r='15' fill='%2310b981'/></svg>">
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+
+        <!-- PWA: installable as an app -->
+        <link rel="manifest" href="/manifest.webmanifest">
+        <meta name="theme-color" content="#C2714F">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        <meta name="apple-mobile-web-app-title" content="Juggler">
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
@@ -46,5 +56,14 @@
                 {{ $slot }}
             </div>
         </div>
+
+        {{-- Register the PWA service worker (installable from the login screen too) --}}
+        <script>
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js').catch(() => {});
+                });
+            }
+        </script>
     </body>
 </html>
