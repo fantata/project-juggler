@@ -12,15 +12,19 @@
                 $isPriority = $project->priority && $project->priority <= 2;
             @endphp
 
-            <a
-                href="{{ route('projects.detail', $project) }}"
-                wire:navigate
+            {{-- Card is a plain container; the project name is a "stretched link"
+                 that makes the whole card open the detail page, while the board
+                 links in the footer sit above it (relative z-10) and stay clickable. --}}
+            <div
                 class="group relative bg-white dark:bg-gray-800 rounded-xl border border-cream-200 dark:border-gray-700 p-5 hover:shadow-md hover:border-{{ $accent }}-300 dark:hover:border-{{ $accent }}-600 transition-all duration-200 {{ $isPriority ? 'border-l-4 border-l-terracotta-400' : '' }}"
             >
                 <!-- Project name + type -->
                 <div class="flex items-start justify-between gap-2 mb-3">
-                    <h4 class="font-semibold text-bark-800 dark:text-cream-200 group-hover:text-terracotta-600 dark:group-hover:text-terracotta-400 transition-colors leading-tight">
-                        {{ $project->name }}
+                    <h4 class="font-semibold text-bark-800 dark:text-cream-200 leading-tight">
+                        <a href="{{ route('projects.detail', $project) }}" wire:navigate
+                           class="before:absolute before:inset-0 group-hover:text-terracotta-600 dark:group-hover:text-terracotta-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-terracotta-400 rounded">
+                            {{ $project->name }}
+                        </a>
                     </h4>
                     <span class="text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ $project->type->label() }}</span>
                 </div>
@@ -84,7 +88,30 @@
                         @endif
                     </div>
                 @endif
-            </a>
+
+                {{-- Board links: sit above the stretched link so they're clickable.
+                     Kanban is always available; the client board only shows when a
+                     share link is switched on for the project. --}}
+                <div class="relative z-10 mt-4 pt-3 border-t border-cream-100 dark:border-gray-700/60 flex items-center gap-4">
+                    <a href="{{ route('projects.board', $project) }}" wire:navigate
+                       class="inline-flex items-center gap-1.5 text-xs font-medium text-bark-600 dark:text-cream-200 hover:text-terracotta-600 dark:hover:text-terracotta-400 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v12a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18V6zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v6a2.25 2.25 0 01-2.25 2.25h-2.25A2.25 2.25 0 0113.5 12V6z"/>
+                        </svg>
+                        Kanban
+                    </a>
+
+                    @if($project->shareUrl())
+                        <a href="{{ $project->shareUrl() }}" target="_blank" rel="noopener"
+                           class="inline-flex items-center gap-1.5 text-xs font-medium text-bark-600 dark:text-cream-200 hover:text-terracotta-600 dark:hover:text-terracotta-400 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"/>
+                            </svg>
+                            Client board
+                        </a>
+                    @endif
+                </div>
+            </div>
         @endforeach
     </div>
 </div>
