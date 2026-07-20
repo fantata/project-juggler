@@ -9,6 +9,7 @@ use App\Enums\RetainerFrequency;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Project extends Model
 {
@@ -30,6 +31,8 @@ class Project extends Model
         'ai_context',
         'ai_context_updated_at',
         'last_touched_at',
+        'share_token',
+        'share_enabled',
     ];
 
     protected function casts(): array
@@ -47,7 +50,45 @@ class Project extends Model
             'retainer_frequency' => RetainerFrequency::class,
             'retainer_amount' => 'decimal:2',
             'priority' => 'integer',
+            'share_enabled' => 'boolean',
         ];
+    }
+
+    /**
+     * The public client-board URL, or null if sharing is off. The token in the
+     * path is the only auth — treat it like a password in a link.
+     */
+    public function shareUrl(): ?string
+    {
+        if (! $this->share_enabled || ! $this->share_token) {
+            return null;
+        }
+
+        return route('board.show', $this->share_token);
+    }
+
+    /** Turn the client board on, minting a link the first time. */
+    public function enableClientBoard(): void
+    {
+        $this->update([
+            'share_token' => $this->share_token ?: Str::random(48),
+            'share_enabled' => true,
+        ]);
+    }
+
+    /** Mint a fresh link, instantly invalidating the old one. */
+    public function rotateShareToken(): void
+    {
+        $this->update([
+            'share_token' => Str::random(48),
+            'share_enabled' => true,
+        ]);
+    }
+
+    /** Switch the board off. The link 404s until re-enabled. */
+    public function disableClientBoard(): void
+    {
+        $this->update(['share_enabled' => false]);
     }
 
     public function logs(): HasMany

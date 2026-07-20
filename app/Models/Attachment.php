@@ -17,6 +17,8 @@ class Attachment extends Model
         'original_name',
         'mime_type',
         'size',
+        'guest_key',
+        'guest_name',
     ];
 
     protected function casts(): array

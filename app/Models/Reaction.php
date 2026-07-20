@@ -11,6 +11,7 @@ class Reaction extends Model
     protected $fillable = [
         'user_id',
         'emoji',
+        'guest_key',
     ];
 
     public function reactable(): MorphTo

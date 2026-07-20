@@ -27,6 +27,8 @@ class Issue extends Model
         'answer',
         'answered_at',
         'github_issue_number',
+        'guest_key',
+        'guest_name',
     ];
 
     protected function casts(): array
@@ -64,5 +66,16 @@ class Issue extends Model
     public function comments(): MorphMany
     {
         return $this->morphMany(Comment::class, 'commentable');
+    }
+
+    public function reactions(): MorphMany
+    {
+        return $this->morphMany(Reaction::class, 'reactable');
+    }
+
+    /** Client-created cards carry a guest name; internal cards return null. */
+    public function guestAuthor(): ?string
+    {
+        return $this->guest_name;
     }
 }

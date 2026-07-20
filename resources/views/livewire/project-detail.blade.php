@@ -288,6 +288,53 @@
 
         <!-- Sidebar -->
         <div class="lg:col-span-1 space-y-6">
+            <!-- Client share board -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-cream-200 dark:border-gray-700">
+                <div class="p-5" x-data="{ copied: false }">
+                    <h3 class="text-base font-semibold text-bark-800 dark:text-cream-200 mb-1">Client board</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">A shareable, no-login board where a client can add cards, comment, react and drop files.</p>
+
+                    @if(session('share-message'))
+                        <div class="mb-4 p-3 bg-moss-50 dark:bg-moss-900/20 border border-moss-200 dark:border-moss-700 text-moss-700 dark:text-moss-300 rounded-lg text-sm">
+                            {{ session('share-message') }}
+                        </div>
+                    @endif
+
+                    @if($project->shareUrl())
+                        <label for="share-url" class="sr-only">Share link</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="share-url" readonly value="{{ $project->shareUrl() }}"
+                                   x-ref="url" @focus="$el.select()"
+                                   class="flex-1 min-w-0 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 shadow-sm sm:text-sm">
+                            <button type="button"
+                                    @click="navigator.clipboard.writeText($refs.url.value); copied = true; setTimeout(() => copied = false, 1800)"
+                                    class="shrink-0 px-3 py-2 text-sm font-medium text-white bg-terracotta-500 rounded-lg hover:bg-terracotta-600 transition-colors">
+                                <span x-show="!copied">Copy</span>
+                                <span x-show="copied" x-cloak>Copied</span>
+                            </button>
+                        </div>
+
+                        <div class="flex items-center gap-4 mt-3">
+                            <a href="{{ $project->shareUrl() }}" target="_blank" rel="noopener"
+                               class="text-sm text-bark-600 dark:text-cream-200 hover:text-terracotta-600 dark:hover:text-terracotta-400">Preview</a>
+                            <button type="button" wire:click="rotateShareToken"
+                                    wire:confirm="Generate a new link? The current one will stop working immediately."
+                                    class="text-sm text-gray-500 dark:text-gray-400 hover:text-bark-700 dark:hover:text-cream-200">New link</button>
+                            <button type="button" wire:click="disableClientBoard"
+                                    wire:confirm="Turn off the client board? The link will stop working until you re-enable it."
+                                    class="text-sm text-red-400 hover:text-red-600 ml-auto">Turn off</button>
+                        </div>
+                    @else
+                        <button type="button" wire:click="enableClientBoard"
+                                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-terracotta-500 rounded-lg hover:bg-terracotta-600 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"/></svg>
+                            Create a share link
+                        </button>
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-2">Anyone with the link can view and post. Revoke it any time.</p>
+                    @endif
+                </div>
+            </div>
+
             <!-- Log -->
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-cream-200 dark:border-gray-700">
                 <div class="p-5">
