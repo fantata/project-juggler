@@ -6,12 +6,21 @@ Personal project/task management system and AI PA backbone.
 
 - Laravel 12 + Livewire 4 + Alpine.js + Tailwind CSS (TALL)
 - Local: <http://project-juggler.test> (Laravel Herd)
-- Production: <https://juggler.fantata.dev> (sv3/Hetzner, Docker behind shared Caddy)
+- Production: <https://project-juggler.sv3.fantata.com> (sv3/Hetzner, Docker behind shared Caddy)
 - MySQL (shared DO instance)
 
 ## Key models
 
-ModelPurposeProjectTop-level work item — client, personal, or speculativeProjectLogFreeform work diary attached to a projectIssueBug/feature/task attached to a projectIssueTaskSub-task checklist item on an IssueCalendarEventNative calendar event (exported via ICS)IcsFeedExternal calendar subscriptionIcsFeedEventEvent synced from an external ICS feedDailyNotePersonal daily log — mood, energy, context (not project-specific)
+| Model | Purpose |
+|-------|---------|
+| Project | Top-level work item — client, personal, or speculative |
+| ProjectLog | Freeform work diary attached to a project |
+| Issue | Bug/feature/task attached to a project |
+| IssueTask | Sub-task checklist item on an Issue |
+| CalendarEvent | Native calendar event (exported via ICS) |
+| IcsFeed | External calendar subscription |
+| IcsFeedEvent | Event synced from an external ICS feed |
+| DailyNote | Personal daily log — mood, energy, context (not project-specific) |
 
 ## MCP server
 
@@ -21,11 +30,11 @@ Restart: kill the process and let Claude Desktop restart it, or: `cd mcp-server 
 
 ## API
 
-REST API documented in `docs/api-reference.md`. Auth: Bearer token (generate from Profile &gt; API Token in web UI). Base URL (prod): <https://juggler.fantata.dev/api>
+REST API documented in `docs/api-reference.md`. Auth: Bearer token (generate from Profile > API Token in web UI). Base URL (prod): <https://project-juggler.sv3.fantata.com/api>
 
 ## ICS feed
 
-Export URL: `GET /api/ics/{token}.ics` — subscribe this in Apple Calendar. Token generated from Profile &gt; Calendar Feed in web UI.
+Export URL: `GET /api/ics/{token}.ics` — subscribe this in Apple Calendar. Token generated from Profile > Calendar Feed in web UI.
 
 ## Start of every Claude Code session
 
@@ -48,4 +57,4 @@ The deploy auto-runs migrations (`php artisan migrate --force`), so schema chang
 
 ## Known issues
 
-- Web route is `projects.detail` (not `projects.show`) to avoid collision with the API `apiResource('projects')` which generates `projects.show`. [start.sh](http://start.sh)runs `route:clear` before `route:cache` to prevent stale cache issues.
+- Web route is `projects.detail` (not `projects.show`) to avoid collision with the API `apiResource('projects')` which generates `projects.show`. `start.sh` runs `route:clear` before `route:cache` to prevent stale cache issues.
