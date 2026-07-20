@@ -1,59 +1,81 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Project Juggler
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Personal project, task and calendar management system. Second brain and AI PA backbone for Chris Read.
 
-## About Laravel
+## Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Laravel 12, Livewire 4, Alpine.js, Tailwind CSS (TALL)
+- MySQL (shared DigitalOcean managed instance)
+- Local dev: <http://project-juggler.test> (Laravel Herd)
+- Production: <https://juggler.fantata.dev> (sv3/Hetzner, Docker behind shared Caddy)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## What it does
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Tracks projects (client, personal, speculative), with money status, deadlines, retainers, GitHub repo links
+- Tracks issues and sub-tasks against projects, optionally synced with GitHub
+- Freeform work logs and personal daily notes
+- Native calendar events plus subscribed external ICS feeds with rule-based filtering
+- Exports its own native events as an ICS feed for Apple/Google Calendar
+- Twice-daily AI briefing emails (8am and 5pm) summarising state via the Anthropic API
+- Per-project AI context column for session-to-session memory handoff
 
-## Learning Laravel
+## Three front doors
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+Same domain code, three surfaces:
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- **Web UI**: Livewire pages for humans
+- **REST API**: Sanctum-authenticated, see [docs/api-reference.md](docs/api-reference.md)
+- **MCP server**: Laravel-native, lives in `app/Mcp/`, used by Claude Desktop
 
-## Laravel Sponsors
+## MCP server
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+Laravel-native MCP implementation in `app/Mcp/`. Tools include `quick-status`, `list-projects`, `get-project`, `create-project`, `update-project`, `log-work`, `create-issue`, `list-issues`, `update-issue`, `sync-issues`, `list-tasks`, `update-project-context`, `get-project-context`, `add-daily-note`, `get-daily-notes`, `get-today`, `list-calendar-events`, `create-calendar-event`, `get-github-activity`.
 
-### Premium Partners
+Auth: same Sanctum tokens as the REST API. Generate from Profile > API Token in the web UI.
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+The legacy Node MCP server (`mcp-server/`) is deprecated and pending deletion.
 
-## Contributing
+## Calendar export (ICS)
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Public route: `GET /ics/{token}.ics` (note: web route, NOT under `/api`).
 
-## Code of Conduct
+Generate the token from Profile > Calendar Feed in the web UI, then subscribe in Apple Calendar / Google Calendar / Outlook.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Production URL pattern: `https://juggler.fantata.dev/ics/{token}.ics`
 
-## Security Vulnerabilities
+Only native `CalendarEvent` rows are exported. Subscribed feed events are deliberately excluded so external calendars don't double up.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Start of every Claude Code session
+
+1. `quick_status` for current project overview
+2. `get_today` for calendar context
+3. `get_daily_notes` (last 7 days) if returning after a gap
+4. `get_github_activity` (days: 7) for recent commit activity
+
+## End of every Claude Code session
+
+Call `update_project_context` to persist state for future sessions.
+
+## Deployment
+
+Push to `main` -> GitHub Actions -> rsync to sv3 -> `docker compose -f docker-compose.sv3.yml up -d --build`. App runs in Docker on sv3 (138.201.33.178, Hetzner), joined to the shared Caddy `web` network (no published host port), using the shared MySQL.
+
+GitHub Actions requires the `SV3_SSH_KEY` secret (private key for `chris@138.201.33.178`).
+
+The deploy auto-runs `php artisan migrate --force` (plus `config:clear` / `view:clear`), so migrations apply on every deploy. To run them by hand:
+
+```bash
+ssh sv3 "cd /home/chris/apps/project-juggler && docker exec project-juggler php artisan migrate --force"
+```
+
+## Roadmap
+
+See [SPEC_2026_UPGRADES.md](SPEC_2026_UPGRADES.md) for the full 2026 spec covering memories, agents, domain events, hybrid search, policy files, malleable views and unified search across all data sources.
+
+## Known quirks
+
+- Web detail route is named `projects.detail` (not `projects.show`) to avoid collision with the `apiResource('projects')` route which generates `projects.show`. `start.sh` runs `route:clear` before `route:cache` to prevent stale cache issues.
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Private. Not for redistribution.

@@ -1,6 +1,6 @@
 # sv3 (Hetzner) deployment.
 #
-# Unlike docker-compose.yml (sv2, host port 8005), on sv3 the app joins the
+# Unlike docker-compose.yml (local default, host port 8005), on sv3 the app joins the
 # shared external `web` network and is reached by the core Caddy container via
 # `reverse_proxy project-juggler:80`. NO host port is published, and NO database
 # runs here: PJ uses the shared core-mysql-1 (DB_HOST=mysql on the `web` network).
@@ -9,7 +9,7 @@
 #   docker compose -f docker-compose.sv3.yml up -d --build
 #
 # Gotcha (see silo: sv3-deployment-gotchas): the deploy rsync MUST exclude
-# compose*.yml so this file is never clobbered by the sv2 default.
+# compose*.yml so this file is never clobbered by the local default.
 services:
   app:
     build: .
