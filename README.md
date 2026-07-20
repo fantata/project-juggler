@@ -7,7 +7,7 @@ Personal project, task and calendar management system. Second brain and AI PA ba
 - Laravel 12, Livewire 4, Alpine.js, Tailwind CSS (TALL)
 - MySQL (shared DigitalOcean managed instance)
 - Local dev: <http://project-juggler.test> (Laravel Herd)
-- Production: <https://juggler.fantata.dev> (sv3/Hetzner, Docker behind shared Caddy)
+- Production: <https://project-juggler.sv3.fantata.com> (sv3/Hetzner, Docker behind shared Caddy)
 
 ## What it does
 
@@ -41,7 +41,7 @@ Public route: `GET /ics/{token}.ics` (note: web route, NOT under `/api`).
 
 Generate the token from Profile > Calendar Feed in the web UI, then subscribe in Apple Calendar / Google Calendar / Outlook.
 
-Production URL pattern: `https://juggler.fantata.dev/ics/{token}.ics`
+Production URL pattern: `https://project-juggler.sv3.fantata.com/ics/{token}.ics`
 
 Only native `CalendarEvent` rows are exported. Subscribed feed events are deliberately excluded so external calendars don't double up.
 
