@@ -286,6 +286,28 @@ class ProjectDetail extends Component
         $this->project->refresh();
     }
 
+    /** Turn on the shareable client board and mint its link. */
+    public function enableClientBoard(): void
+    {
+        $this->project->enableClientBoard();
+        $this->project->refresh();
+    }
+
+    /** Replace the link with a fresh one — the old URL stops working at once. */
+    public function rotateShareToken(): void
+    {
+        $this->project->rotateShareToken();
+        $this->project->refresh();
+        session()->flash('share-message', 'New link generated — the old one no longer works.');
+    }
+
+    /** Switch the client board off. The link 404s until re-enabled. */
+    public function disableClientBoard(): void
+    {
+        $this->project->disableClientBoard();
+        $this->project->refresh();
+    }
+
     public function delete(): void
     {
         $this->project->delete();

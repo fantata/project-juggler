@@ -14,7 +14,15 @@ class Comment extends Model
         'user_id',
         'parent_id',
         'body',
+        'guest_key',
+        'guest_name',
     ];
+
+    /** Who said it — a user, or a named guest from the client board. */
+    public function authorName(): string
+    {
+        return $this->user?->name ?? $this->guest_name ?? 'Guest';
+    }
 
     public function commentable(): MorphTo
     {
