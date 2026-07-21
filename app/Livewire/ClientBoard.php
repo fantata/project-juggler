@@ -59,19 +59,6 @@ class ClientBoard extends Component
     public string $commentBody = '';
     public array $files = [];
 
-    /**
-     * A small, deliberately classy reaction set — line icons, not the usual
-     * emoji soup. Stored by key in reactions.emoji. Easy to reorder or swap.
-     * key => human label (for aria/tooltips).
-     */
-    public const REACTIONS = [
-        'approve' => 'Approve',
-        'love' => 'Love',
-        'star' => 'Standout',
-        'question' => 'Question',
-        'seen' => 'Seen',
-    ];
-
     /** Content types accepted on a card — validated by real MIME, not extension,
      *  so browser-recorded voice memos (audio/webm, audio/mp4) pass too. No
      *  SVG/HTML: served same-origin they could run JS (stored XSS). */
@@ -190,38 +177,6 @@ class ClientBoard extends Component
             ->first()?->delete();
     }
 
-    /** Toggle a reaction on a card. Named guests only; scoped to this project. */
-    public function react(int $issueId, string $key): void
-    {
-        if (! $this->isNamed() || ! array_key_exists($key, self::REACTIONS)) {
-            return;
-        }
-
-        $issue = $this->project->issues()->clientVisible()->whereKey($issueId)->first();
-
-        if ($issue === null) {
-            return;
-        }
-
-        $existing = $issue->reactions()
-            ->where('guest_key', $this->guestKey)
-            ->where('emoji', $key)
-            ->first();
-
-        if ($existing) {
-            $existing->delete();
-
-            return;
-        }
-
-        $issue->reactions()->create([
-            'emoji' => $key,
-            'guest_key' => $this->guestKey,
-        ]);
-
-        $this->project->update(['last_touched_at' => now()]);
-    }
-
     /** Runs when files are dropped/recorded onto the open card. */
     public function updatedFiles(): void
     {
@@ -282,7 +237,6 @@ class ClientBoard extends Component
 
         $issues = $this->project->issues()
             ->clientVisible()
-            ->with(['reactions'])
             ->withCount([
                 'comments',
                 'attachments',
@@ -298,7 +252,6 @@ class ClientBoard extends Component
 
         $openCard = $this->openCardId === null ? null : Issue::with([
             'tasks',
-            'reactions',
             'attachments',
             'comments' => fn ($q) => $q->with('user')->oldest(),
         ])
@@ -308,7 +261,6 @@ class ClientBoard extends Component
         return view('livewire.client-board', [
             'issues' => $issues,
             'openCard' => $openCard,
-            'reactionSet' => self::REACTIONS,
         ]);
     }
 }

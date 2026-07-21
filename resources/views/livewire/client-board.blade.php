@@ -11,16 +11,8 @@
     {{-- Masthead --}}
     <header class="flex items-start justify-between gap-4 mb-6">
         <div class="min-w-0">
-            <div class="flex items-center gap-2.5">
-                <svg class="w-7 h-7 shrink-0" viewBox="0 0 100 100" aria-hidden="true">
-                    <path d="M20 70 Q50-10 80 70" fill="none" stroke="#C4AD74" stroke-width="4" stroke-linecap="round"/>
-                    <circle cx="20" cy="70" r="13" fill="#C2714F"/>
-                    <circle cx="50" cy="18" r="13" fill="#6B8F71"/>
-                    <circle cx="80" cy="70" r="13" fill="#8B6914"/>
-                </svg>
-                <h1 class="font-semibold text-xl sm:text-2xl text-bark-800 dark:text-cream-100 truncate">{{ $project->name }}</h1>
-            </div>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">A shared board — add cards, leave notes, react.</p>
+            <h1 class="font-semibold text-xl sm:text-2xl text-bark-800 dark:text-cream-100 truncate">{{ $project->name }}</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">A shared board — add cards and leave notes.</p>
         </div>
 
         @if ($this->isNamed())
@@ -140,9 +132,6 @@
                     </div>
                 </button>
 
-                <div class="mt-3">
-                    @include('livewire.partials.client-reactions', ['card' => $card])
-                </div>
             </article>
         @empty
             <div class="rounded-2xl border border-dashed border-cream-300 dark:border-gray-700 p-10 text-center">
@@ -187,10 +176,6 @@
                         <p class="text-sm text-bark-700 dark:text-gray-300 whitespace-pre-line">{{ $openCard->description }}</p>
                     @endif
 
-                    {{-- Reactions --}}
-                    <div>
-                        @include('livewire.partials.client-reactions', ['card' => $openCard])
-                    </div>
 
                     {{-- Checklist (read-only view of progress) --}}
                     @if ($openCard->tasks->isNotEmpty())

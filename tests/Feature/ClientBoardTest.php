@@ -139,34 +139,6 @@ class ClientBoardTest extends TestCase
         $this->assertDatabaseMissing('comments', ['id' => $comment->id]);
     }
 
-    public function test_a_reaction_toggles_per_guest(): void
-    {
-        $project = $this->sharedProject();
-        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Card', 'board_column' => 'todo', 'is_client_visible' => true]);
-
-        $sarah = $this->asGuest($project, 'Sarah', 'sarah-key');
-        $sarah->call('react', $issue->id, 'approve');
-        $this->assertSame(1, $issue->reactions()->count());
-
-        // A second guest reacting the same way is a distinct reaction.
-        $this->asGuest($project, 'Danny', 'danny-key')->call('react', $issue->id, 'approve');
-        $this->assertSame(2, $issue->reactions()->count());
-
-        // Sarah toggling hers off leaves Danny's intact.
-        $sarah->call('react', $issue->id, 'approve');
-        $this->assertSame(1, $issue->reactions()->count());
-    }
-
-    public function test_an_unknown_reaction_key_is_ignored(): void
-    {
-        $project = $this->sharedProject();
-        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Card', 'board_column' => 'todo', 'is_client_visible' => true]);
-
-        $this->asGuest($project)->call('react', $issue->id, 'poop');
-
-        $this->assertSame(0, $issue->reactions()->count());
-    }
-
     public function test_a_guest_can_upload_a_file_but_not_an_executable_type(): void
     {
         Storage::fake('local');
