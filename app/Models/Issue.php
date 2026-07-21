@@ -19,6 +19,7 @@ class Issue extends Model
         'status',
         'assignee_id',
         'kind',
+        'is_client_visible',
         'board_column',
         'position',
         'urgency',
@@ -38,9 +39,16 @@ class Issue extends Model
             'urgency' => IssueUrgency::class,
             'due_bucket' => DueBucket::class,
             'is_question' => 'boolean',
+            'is_client_visible' => 'boolean',
             'answered_at' => 'datetime',
             'position' => 'integer',
         ];
+    }
+
+    /** Cards opted into the project's public client board. */
+    public function scopeClientVisible($query)
+    {
+        return $query->where('is_client_visible', true);
     }
 
     public function project(): BelongsTo

@@ -75,6 +75,23 @@ class BoardTest extends TestCase
         $this->assertSame('doing', $issue->fresh()->board_column);
     }
 
+    public function test_toggle_client_visible_flips_the_flag(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $project = $this->project();
+        // Defaults to internal.
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Billing note', 'board_column' => 'todo']);
+        $this->assertFalse($issue->fresh()->is_client_visible);
+
+        Livewire::test(Board::class, ['project' => $project])
+            ->call('toggleClientVisible', $issue->id);
+        $this->assertTrue($issue->fresh()->is_client_visible);
+
+        Livewire::test(Board::class, ['project' => $project])
+            ->call('toggleClientVisible', $issue->id);
+        $this->assertFalse($issue->fresh()->is_client_visible);
+    }
+
     public function test_move_card_to_sets_column_and_persists_order(): void
     {
         $this->actingAs(User::factory()->create());

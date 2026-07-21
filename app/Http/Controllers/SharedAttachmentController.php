@@ -28,6 +28,7 @@ class SharedAttachmentController extends Controller
 
         $belongs = Issue::whereKey($attachment->attachable_id)
             ->where('project_id', $project->id)
+            ->clientVisible()
             ->exists();
 
         abort_unless($belongs, 404);

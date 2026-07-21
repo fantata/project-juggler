@@ -140,6 +140,8 @@ class ClientBoard extends Component
             'status' => 'open',
             'urgency' => 'medium',
             'board_column' => 'ideas',
+            // Cards raised by the client belong on the client board.
+            'is_client_visible' => true,
             'guest_key' => $this->guestKey,
             'guest_name' => $this->guestName,
         ]);
@@ -150,7 +152,7 @@ class ClientBoard extends Component
 
     public function openCard(int $issueId): void
     {
-        $this->openCardId = $this->project->issues()->whereKey($issueId)->value('id');
+        $this->openCardId = $this->project->issues()->clientVisible()->whereKey($issueId)->value('id');
         $this->reset('commentBody', 'files');
     }
 
@@ -168,7 +170,7 @@ class ClientBoard extends Component
         $this->commentBody = trim($this->commentBody);
         $this->validate(['commentBody' => 'required|string|max:2000']);
 
-        $issue = $this->project->issues()->findOrFail($this->openCardId);
+        $issue = $this->project->issues()->clientVisible()->findOrFail($this->openCardId);
 
         $issue->comments()->create([
             'body' => $this->commentBody,
@@ -195,7 +197,7 @@ class ClientBoard extends Component
             return;
         }
 
-        $issue = $this->project->issues()->whereKey($issueId)->first();
+        $issue = $this->project->issues()->clientVisible()->whereKey($issueId)->first();
 
         if ($issue === null) {
             return;
@@ -235,7 +237,7 @@ class ClientBoard extends Component
             'files.*.max' => 'Files need to be under 25 MB each.',
         ]);
 
-        $issue = $this->project->issues()->findOrFail($this->openCardId);
+        $issue = $this->project->issues()->clientVisible()->findOrFail($this->openCardId);
 
         foreach ($this->files as $file) {
             // Private disk — reachable only through the token-scoped controller.
@@ -260,7 +262,7 @@ class ClientBoard extends Component
     public function deleteOwnAttachment(int $attachmentId): void
     {
         Attachment::where('attachable_type', Issue::class)
-            ->whereIn('attachable_id', $this->project->issues()->select('id'))
+            ->whereIn('attachable_id', $this->project->issues()->clientVisible()->select('id'))
             ->where('guest_key', $this->guestKey)
             ->whereKey($attachmentId)
             ->first()?->delete();
@@ -270,7 +272,7 @@ class ClientBoard extends Component
     private function guestScopedComments()
     {
         return Comment::where('commentable_type', Issue::class)
-            ->whereIn('commentable_id', $this->project->issues()->select('id'))
+            ->whereIn('commentable_id', $this->project->issues()->clientVisible()->select('id'))
             ->where('guest_key', $this->guestKey);
     }
 
@@ -279,6 +281,7 @@ class ClientBoard extends Component
         $search = trim($this->search);
 
         $issues = $this->project->issues()
+            ->clientVisible()
             ->with(['reactions'])
             ->withCount([
                 'comments',

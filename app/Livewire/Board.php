@@ -109,6 +109,17 @@ class Board extends Component
         $this->project->update(['last_touched_at' => now()]);
     }
 
+    /**
+     * Flip a card between internal-only and client-facing. Client-facing cards
+     * are the only ones shown on the project's public client board.
+     */
+    public function toggleClientVisible(int $issueId): void
+    {
+        $issue = $this->project->issues()->findOrFail($issueId);
+        $issue->update(['is_client_visible' => ! $issue->is_client_visible]);
+        $this->project->update(['last_touched_at' => now()]);
+    }
+
     public function openCard(int $issueId): void
     {
         // Only open cards that belong to this project.
