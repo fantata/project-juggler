@@ -155,6 +155,34 @@ class ClientBoardTest extends TestCase
         $this->assertSame(1, $issue->fresh()->attachments()->count());
     }
 
+    /**
+     * A browser-recorded voice note (webm audio) uploads and records its metadata.
+     *
+     * NB: this does NOT reproduce the prod 500 — Livewire's TemporaryUploadedFile
+     * short-circuits getSize()/getMimeType() under runningUnitTests(), so the
+     * move-then-read crash only surfaces over real HTTP. The guard against that
+     * regression is reading metadata BEFORE store() in the component itself.
+     */
+    public function test_a_guest_can_upload_a_recorded_voice_note(): void
+    {
+        Storage::fake('local');
+        config(['livewire.temporary_file_upload.disk' => 'local']);
+
+        $project = $this->sharedProject();
+        $issue = Issue::create(['project_id' => $project->id, 'title' => 'Card', 'board_column' => 'todo', 'is_client_visible' => true]);
+
+        $this->asGuest($project)
+            ->call('openCard', $issue->id)
+            ->set('files', [UploadedFile::fake()->create('voice-memo.webm', 40, 'audio/webm')])
+            ->assertHasNoErrors();
+
+        $attachment = $issue->fresh()->attachments()->first();
+
+        $this->assertNotNull($attachment);
+        $this->assertSame(40 * 1024, $attachment->size);
+        $this->assertSame('voice-memo.webm', $attachment->original_name);
+    }
+
     public function test_shared_attachment_streams_for_its_own_project(): void
     {
         Storage::fake('local');

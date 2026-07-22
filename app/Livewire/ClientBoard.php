@@ -195,15 +195,23 @@ class ClientBoard extends Component
         $issue = $this->project->issues()->clientVisible()->findOrFail($this->openCardId);
 
         foreach ($this->files as $file) {
+            // Read metadata BEFORE storing: when Livewire's temp-upload disk is the
+            // same as the destination ('local'), store() MOVES the temp file rather
+            // than copying it — so getSize()/getMimeType() afterwards hit a file that
+            // no longer exists and throw (a 500 on the client board). Grab it first.
+            $originalName = $file->getClientOriginalName();
+            $mimeType = $file->getMimeType();
+            $size = $file->getSize();
+
             // Private disk — reachable only through the token-scoped controller.
             $path = $file->store("attachments/{$issue->id}", 'local');
 
             $issue->attachments()->create([
                 'disk' => 'local',
                 'path' => $path,
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'size' => $file->getSize(),
+                'original_name' => $originalName,
+                'mime_type' => $mimeType,
+                'size' => $size,
                 'guest_key' => $this->guestKey,
                 'guest_name' => $this->guestName,
             ]);
