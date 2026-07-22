@@ -209,7 +209,7 @@
                                             <a href="{{ $fileUrl }}" target="_blank" rel="noopener" class="block aspect-square">
                                                 <img src="{{ $fileUrl }}" alt="{{ $att->original_name }}" class="w-full h-full object-cover">
                                             </a>
-                                        @elseif (Str::startsWith((string) $att->mime_type, 'audio/'))
+                                        @elseif ($att->isAudio())
                                             <div class="flex flex-col justify-center aspect-square p-2">
                                                 <audio controls preload="none" src="{{ $fileUrl }}" class="w-full"></audio>
                                                 <span class="text-xs text-bark-700 dark:text-gray-300 truncate mt-1">{{ $att->original_name }}</span>

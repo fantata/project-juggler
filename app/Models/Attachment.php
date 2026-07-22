@@ -56,6 +56,18 @@ class Attachment extends Model
         return str_starts_with((string) $this->mime_type, 'image/');
     }
 
+    /**
+     * Playable as audio? True for real audio MIMEs, and also for browser voice
+     * memos: MediaRecorder writes into a webm/mp4 *container*, so the server-side
+     * MIME guess comes back as video/* even though it's an audio-only recording.
+     * Those are always named "voice-memo.<ext>", so we recognise them by name.
+     */
+    public function isAudio(): bool
+    {
+        return str_starts_with((string) $this->mime_type, 'audio/')
+            || str_starts_with((string) $this->original_name, 'voice-memo.');
+    }
+
     public function humanSize(): string
     {
         return Number::fileSize($this->size, precision: 1);
