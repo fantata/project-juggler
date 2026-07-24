@@ -114,6 +114,9 @@
                         @if ($card->guest_name)
                             <span>by {{ $card->guest_name }}</span>
                         @endif
+                        @if ($card->wasEdited())
+                            <span title="Edited {{ $card->edited_at->diffForHumans() }}">edited</span>
+                        @endif
                         @if ($card->tasks_count > 0)
                             <span>{{ $card->completed_tasks_count }}/{{ $card->tasks_count }} done</span>
                         @endif
@@ -168,12 +171,46 @@
                 </div>
 
                 <div class="px-5 py-4 space-y-5">
-                    @if ($openCard->guest_name)
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Added by {{ $openCard->guest_name }}</p>
-                    @endif
+                    @if ($editingCardId === $openCard->id)
+                        {{-- The author rewriting their own card --}}
+                        <form wire:submit="updateCard" class="space-y-3">
+                            <div>
+                                <label for="edit-title" class="block text-sm font-medium text-bark-700 dark:text-cream-200 mb-1">Title</label>
+                                <input type="text" id="edit-title" wire:model="editTitle"
+                                       class="w-full rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 shadow-sm focus:border-terracotta-400 focus:ring-terracotta-400 text-sm">
+                                @error('editTitle') <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label for="edit-desc" class="block text-sm font-medium text-bark-700 dark:text-cream-200 mb-1">Detail</label>
+                                <textarea id="edit-desc" wire:model="editDescription" rows="4" placeholder="Add any detail (optional)…"
+                                          class="w-full rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 shadow-sm focus:border-terracotta-400 focus:ring-terracotta-400 text-sm"></textarea>
+                                @error('editDescription') <p class="text-sm text-red-600 dark:text-red-400 mt-1">{{ $message }}</p> @enderror
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="submit" class="rounded-xl bg-terracotta-600 text-white px-4 py-2 text-sm font-medium hover:bg-terracotta-700">Save changes</button>
+                                <button type="button" wire:click="cancelEdit" class="rounded-xl px-4 py-2 text-sm font-medium text-bark-600 dark:text-gray-300 hover:text-bark-800 dark:hover:text-gray-100">Cancel</button>
+                            </div>
+                        </form>
+                    @else
+                        @if ($openCard->guest_name)
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                Added by {{ $openCard->guest_name }}@if ($openCard->wasEdited()) · edited {{ $openCard->edited_at->diffForHumans() }}@endif
+                            </p>
+                        @endif
 
-                    @if ($openCard->description)
-                        <p class="text-sm text-bark-700 dark:text-gray-300 whitespace-pre-line">{{ $openCard->description }}</p>
+                        @if ($openCard->description)
+                            <p class="text-sm text-bark-700 dark:text-gray-300 whitespace-pre-line">{{ $openCard->description }}</p>
+                        @endif
+
+                        @if ($this->ownsCard($openCard))
+                            <div class="flex items-center gap-3">
+                                <button type="button" wire:click="editCard({{ $openCard->id }})"
+                                        class="text-sm font-medium text-bark-600 dark:text-gray-300 hover:text-terracotta-600 dark:hover:text-terracotta-400">Edit</button>
+                                <button type="button" wire:click="deleteOwnCard({{ $openCard->id }})"
+                                        wire:confirm="Delete this card? Its comments and files go too, and that can't be undone."
+                                        class="text-sm font-medium text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400">Delete</button>
+                            </div>
+                        @endif
                     @endif
 
 
@@ -277,13 +314,33 @@
                             <div wire:key="comment-{{ $comment->id }}" class="mb-3">
                                 <div class="flex items-center gap-2 text-sm">
                                     <span class="font-medium text-bark-700 dark:text-cream-200">{{ $comment->authorName() }}</span>
-                                    <span class="text-xs text-gray-400 dark:text-gray-500">{{ $comment->created_at->diffForHumans() }}</span>
-                                    @if ($comment->guest_key === $guestKey && $guestKey !== '')
-                                        <button type="button" wire:click="deleteOwnComment({{ $comment->id }})" wire:confirm="Delete your comment?"
-                                                class="ml-auto text-xs text-gray-400 hover:text-red-600 dark:hover:text-red-400">Delete</button>
+                                    <span class="text-xs text-gray-400 dark:text-gray-500">
+                                        {{ $comment->created_at->diffForHumans() }}@if ($comment->wasEdited()) · edited @endif
+                                    </span>
+                                    @if ($this->ownsComment($comment) && $editingCommentId !== $comment->id)
+                                        <span class="ml-auto flex items-center gap-2">
+                                            <button type="button" wire:click="editComment({{ $comment->id }})"
+                                                    class="text-sm text-gray-500 hover:text-terracotta-600 dark:text-gray-400 dark:hover:text-terracotta-400">Edit</button>
+                                            <button type="button" wire:click="deleteOwnComment({{ $comment->id }})" wire:confirm="Delete your comment?"
+                                                    class="text-sm text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400">Delete</button>
+                                        </span>
                                     @endif
                                 </div>
-                                <p class="text-sm text-bark-700 dark:text-gray-300 whitespace-pre-line mt-0.5">{{ $comment->body }}</p>
+
+                                @if ($editingCommentId === $comment->id)
+                                    <form wire:submit="updateComment" class="mt-1.5 space-y-2">
+                                        <label for="edit-comment-{{ $comment->id }}" class="sr-only">Edit your comment</label>
+                                        <textarea wire:model="editCommentBody" id="edit-comment-{{ $comment->id }}" rows="3"
+                                                  class="w-full resize-none rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 shadow-sm focus:border-terracotta-400 focus:ring-terracotta-400 text-sm"></textarea>
+                                        @error('editCommentBody') <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                                        <div class="flex items-center gap-2">
+                                            <button type="submit" class="rounded-xl bg-terracotta-600 text-white px-3.5 py-1.5 text-sm font-medium hover:bg-terracotta-700">Save</button>
+                                            <button type="button" wire:click="cancelCommentEdit" class="rounded-xl px-3.5 py-1.5 text-sm font-medium text-bark-600 dark:text-gray-300 hover:text-bark-800 dark:hover:text-gray-100">Cancel</button>
+                                        </div>
+                                    </form>
+                                @else
+                                    <p class="text-sm text-bark-700 dark:text-gray-300 whitespace-pre-line mt-0.5">{{ $comment->body }}</p>
+                                @endif
                             </div>
                         @empty
                             <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">No comments yet.</p>

@@ -30,6 +30,7 @@ class Issue extends Model
         'github_issue_number',
         'guest_key',
         'guest_name',
+        'edited_at',
     ];
 
     protected function casts(): array
@@ -41,8 +42,27 @@ class Issue extends Model
             'is_question' => 'boolean',
             'is_client_visible' => 'boolean',
             'answered_at' => 'datetime',
+            'edited_at' => 'datetime',
             'position' => 'integer',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Comments, tasks and attachments hang off a card polymorphically, so the
+        // database can't cascade for us. Delete them through the models (not a
+        // mass query) so Attachment's deleted hook still removes the stored file.
+        static::deleting(function (Issue $issue): void {
+            $issue->tasks()->cursor()->each->delete();
+            $issue->comments()->cursor()->each->delete();
+            $issue->attachments()->cursor()->each->delete();
+        });
+    }
+
+    /** Has the author rewritten this card since posting it? */
+    public function wasEdited(): bool
+    {
+        return $this->edited_at !== null;
     }
 
     /** Cards opted into the project's public client board. */

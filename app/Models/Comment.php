@@ -16,12 +16,26 @@ class Comment extends Model
         'body',
         'guest_key',
         'guest_name',
+        'edited_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'edited_at' => 'datetime',
+        ];
+    }
 
     /** Who said it — a user, or a named guest from the client board. */
     public function authorName(): string
     {
         return $this->user?->name ?? $this->guest_name ?? 'Guest';
+    }
+
+    /** Has the author rewritten this comment since posting it? */
+    public function wasEdited(): bool
+    {
+        return $this->edited_at !== null;
     }
 
     public function commentable(): MorphTo

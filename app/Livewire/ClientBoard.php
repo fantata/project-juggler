@@ -45,19 +45,35 @@ class ClientBoard extends Component
 
     /** Filters — sensible defaults: everything, newest first. */
     public string $statusFilter = 'all';
+
     public string $search = '';
 
     /** Add-a-card composer. */
     public bool $showAddCard = false;
+
     public string $newTitle = '';
+
     public string $newDescription = '';
+
+    /** Inline editor for a card this guest raised. */
+    public ?int $editingCardId = null;
+
+    public string $editTitle = '';
+
+    public string $editDescription = '';
 
     /** The open card's detail sheet, if any. */
     public ?int $openCardId = null;
 
     /** Comment composer + pending uploads on the open card. */
     public string $commentBody = '';
+
     public array $files = [];
+
+    /** Inline editor for a comment this guest wrote. */
+    public ?int $editingCommentId = null;
+
+    public string $editCommentBody = '';
 
     /** Content types accepted on a card — validated by real MIME, not extension,
      *  so browser-recorded voice memos (audio/webm, audio/mp4) pass too. No
@@ -137,15 +153,111 @@ class ClientBoard extends Component
         $this->project->update(['last_touched_at' => now()]);
     }
 
+    /**
+     * This project's client-visible cards raised by the current guest — the only
+     * cards they may rewrite or remove. Scoped at query time so an unknown id
+     * simply doesn't resolve, rather than relying on the template to hide it.
+     */
+    private function guestScopedCards()
+    {
+        // A blank key must never match: internal cards have a null guest_key and
+        // an unidentified visitor must not end up owning anything.
+        if ($this->guestKey === '') {
+            return $this->project->issues()->whereRaw('1 = 0');
+        }
+
+        return $this->project->issues()->clientVisible()->where('guest_key', $this->guestKey);
+    }
+
+    /** Does this card belong to the guest looking at it? Drives the UI only. */
+    public function ownsCard(Issue $card): bool
+    {
+        return $this->guestKey !== '' && $card->guest_key === $this->guestKey;
+    }
+
+    public function editCard(int $issueId): void
+    {
+        $card = $this->guestScopedCards()->whereKey($issueId)->first();
+
+        if (! $card) {
+            return;
+        }
+
+        $this->editingCardId = $card->id;
+        $this->editTitle = $card->title;
+        $this->editDescription = (string) $card->description;
+    }
+
+    public function cancelEdit(): void
+    {
+        $this->reset('editingCardId', 'editTitle', 'editDescription');
+        $this->resetValidation();
+    }
+
+    public function updateCard(): void
+    {
+        if ($this->editingCardId === null) {
+            return;
+        }
+
+        $this->validate([
+            'editTitle' => 'required|string|max:255',
+            'editDescription' => 'nullable|string|max:5000',
+        ], [
+            'editTitle.required' => 'A card needs a title.',
+        ]);
+
+        $card = $this->guestScopedCards()->whereKey($this->editingCardId)->first();
+
+        if (! $card) {
+            $this->cancelEdit();
+
+            return;
+        }
+
+        $card->update([
+            'title' => trim($this->editTitle),
+            'description' => trim($this->editDescription) ?: null,
+            'edited_at' => now(),
+        ]);
+
+        $this->cancelEdit();
+        $this->project->update(['last_touched_at' => now()]);
+    }
+
+    /** Remove a card, but only one this same guest raised. */
+    public function deleteOwnCard(int $issueId): void
+    {
+        $card = $this->guestScopedCards()->whereKey($issueId)->first();
+
+        if (! $card) {
+            return;
+        }
+
+        // Issue::deleting tidies up its tasks, comments and attached files.
+        $card->delete();
+
+        if ($this->openCardId === $issueId) {
+            $this->closeCard();
+        }
+
+        $this->cancelEdit();
+        $this->project->update(['last_touched_at' => now()]);
+    }
+
     public function openCard(int $issueId): void
     {
         $this->openCardId = $this->project->issues()->clientVisible()->whereKey($issueId)->value('id');
         $this->reset('commentBody', 'files');
+        $this->cancelEdit();
+        $this->cancelCommentEdit();
     }
 
     public function closeCard(): void
     {
         $this->reset('openCardId', 'commentBody', 'files');
+        $this->cancelEdit();
+        $this->cancelCommentEdit();
     }
 
     public function addComment(): void
@@ -169,12 +281,68 @@ class ClientBoard extends Component
         $this->project->update(['last_touched_at' => now()]);
     }
 
+    /** Does this comment belong to the guest looking at it? Drives the UI only. */
+    public function ownsComment(Comment $comment): bool
+    {
+        return $this->guestKey !== '' && $comment->guest_key === $this->guestKey;
+    }
+
+    public function editComment(int $commentId): void
+    {
+        $comment = $this->guestScopedComments()->whereKey($commentId)->first();
+
+        if (! $comment) {
+            return;
+        }
+
+        $this->editingCommentId = $comment->id;
+        $this->editCommentBody = (string) $comment->body;
+    }
+
+    public function cancelCommentEdit(): void
+    {
+        $this->reset('editingCommentId', 'editCommentBody');
+        $this->resetValidation();
+    }
+
+    public function updateComment(): void
+    {
+        if ($this->editingCommentId === null) {
+            return;
+        }
+
+        $this->editCommentBody = trim($this->editCommentBody);
+        $this->validate([
+            'editCommentBody' => 'required|string|max:2000',
+        ], [
+            'editCommentBody.required' => "A comment can't be empty — delete it instead.",
+        ]);
+
+        $comment = $this->guestScopedComments()->whereKey($this->editingCommentId)->first();
+
+        if (! $comment) {
+            $this->cancelCommentEdit();
+
+            return;
+        }
+
+        $comment->update([
+            'body' => $this->editCommentBody,
+            'edited_at' => now(),
+        ]);
+
+        $this->cancelCommentEdit();
+        $this->project->update(['last_touched_at' => now()]);
+    }
+
     /** Delete a comment, but only one this same guest wrote. */
     public function deleteOwnComment(int $commentId): void
     {
         $this->guestScopedComments()
             ->whereKey($commentId)
             ->first()?->delete();
+
+        $this->cancelCommentEdit();
     }
 
     /** Runs when files are dropped/recorded onto the open card. */
@@ -234,6 +402,12 @@ class ClientBoard extends Component
     /** Comments across this project's cards authored by the current guest. */
     private function guestScopedComments()
     {
+        // As with cards: a blank key must never match. User-authored comments
+        // carry a null guest_key and are nobody's to edit from out here.
+        if ($this->guestKey === '') {
+            return Comment::whereRaw('1 = 0');
+        }
+
         return Comment::where('commentable_type', Issue::class)
             ->whereIn('commentable_id', $this->project->issues()->clientVisible()->select('id'))
             ->where('guest_key', $this->guestKey);
@@ -258,12 +432,16 @@ class ClientBoard extends Component
             ->orderByRaw("CASE WHEN status = 'done' THEN 1 ELSE 0 END")
             ->get();
 
-        $openCard = $this->openCardId === null ? null : Issue::with([
-            'tasks',
-            'attachments',
-            'comments' => fn ($q) => $q->with('user')->oldest(),
-        ])
-            ->where('project_id', $this->project->id)
+        // clientVisible() matters here, not just on the list: openCardId is a public
+        // Livewire property, so a visitor can set it to any id. Without the scope an
+        // internal card's detail (title, notes, comments, files) would render.
+        $openCard = $this->openCardId === null ? null : $this->project->issues()
+            ->clientVisible()
+            ->with([
+                'tasks',
+                'attachments',
+                'comments' => fn ($q) => $q->with('user')->oldest(),
+            ])
             ->find($this->openCardId);
 
         return view('livewire.client-board', [
